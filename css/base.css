@@ -1,0 +1,134 @@
+:root {
+  --bg: #eef2f7;
+  --surface: #ffffff;
+  --surface-soft: #f6f8fb;
+  --text: #112033;
+  --muted: #55657a;
+  --accent: #005b96;
+  --accent-strong: #003f68;
+  --danger: #9d1f1f;
+  --border: #d5ddea;
+  --ring: #8db7e0;
+  --shadow-soft: 0 12px 24px rgba(17, 32, 51, 0.08);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Source Sans 3", "Segoe UI", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top right, #dfeaf8, transparent 50%),
+    radial-gradient(circle at bottom left, #dfe6f2, transparent 42%),
+    var(--bg);
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Libre Franklin", "Source Sans 3", sans-serif;
+  margin: 0 0 0.5rem;
+  line-height: 1.2;
+}
+
+p {
+  margin: 0 0 0.75rem;
+}
+
+label {
+  font-weight: 600;
+  color: var(--text);
+  display: grid;
+  gap: 0.35rem;
+}
+
+input,
+select,
+button,
+textarea {
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  background: #fff;
+  color: var(--text);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+.btn {
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.85rem;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn:hover {
+  border-color: #b4c5dd;
+}
+
+.btn-primary {
+  border-color: var(--accent);
+  background: linear-gradient(160deg, var(--accent), var(--accent-strong));
+  color: #fff;
+}
+
+.btn-danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn-small {
+  padding: 0.4rem 0.65rem;
+  font-size: 0.95rem;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  font-size: 0.74rem;
+  color: var(--muted);
+  margin: 0 0 0.25rem;
+}
+
+.chip {
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  padding: 0.3rem 0.7rem;
+  font-size: 0.88rem;
+  background: #fff;
+}
+
+.muted {
+  color: var(--muted);
+}

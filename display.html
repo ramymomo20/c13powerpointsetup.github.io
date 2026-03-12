@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lobby Display | AFSCME13</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Libre+Franklin:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/base.css">
+  <link rel="stylesheet" href="./css/display.css">
+</head>
+<body class="display-body">
+  <main class="display-shell">
+    <header class="display-header">
+      <div>
+        <p class="eyebrow">AFSCME Council 13</p>
+        <h1 id="displayTitle">Today's Events</h1>
+      </div>
+      <div class="header-meta">
+        <p id="displayDate" class="meta-date">--</p>
+        <p id="displayTime" class="meta-time">--</p>
+        <p id="modeBadge" class="mode-badge mode-live">LIVE</p>
+      </div>
+    </header>
+
+    <section id="eventsContainer" class="events-grid" aria-live="polite"></section>
+
+    <section id="emptyState" class="empty-state hidden">
+      <h2>No meetings scheduled</h2>
+      <p>There are no visible items for this time block.</p>
+    </section>
+
+    <footer class="display-footer">
+      <p id="statusText">Loading schedule...</p>
+      <p id="activeBlockText">Block: --</p>
+      <p id="lastRefreshText">Refresh: --</p>
+    </footer>
+  </main>
+
+  <script type="module" src="./js/display.js"></script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AFSCME13 Lobby Meeting Display</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/base.css">
+  <style>
+    .home-wrap {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 2rem;
+    }
+
+    .home-card {
+      width: min(680px, 100%);
+      border-radius: 1rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      box-shadow: var(--shadow-soft);
+      padding: 2rem;
+    }
+
+    .home-links {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="home-wrap">
+    <section class="home-card">
+      <h1>AFSCME13 Lobby Meeting Display</h1>
+      <p>Use the display page on the lobby monitor and the admin page for weekly schedule updates.</p>
+      <div class="home-links">
+        <a class="btn btn-primary" href="./display.html">Open Display Page</a>
+        <a class="btn" href="./admin.html">Open Admin Page</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

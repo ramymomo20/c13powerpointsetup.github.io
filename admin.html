@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin | AFSCME13 Lobby Display</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Libre+Franklin:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/base.css">
+  <link rel="stylesheet" href="./css/admin.css">
+</head>
+<body>
+  <main class="admin-wrap">
+    <header class="admin-top">
+      <div>
+        <p class="eyebrow">AFSCME Council 13</p>
+        <h1>Lobby Meeting Display Admin</h1>
+      </div>
+      <div class="top-actions">
+        <span id="signedInAs" class="chip hidden"></span>
+        <button id="signOutBtn" class="btn hidden">Sign Out</button>
+      </div>
+    </header>
+
+    <section id="globalMessage" class="notice hidden"></section>
+
+    <section id="loginCard" class="panel auth-panel">
+      <h2>Staff Sign In</h2>
+      <p>Only <code>@afscme13.org</code> accounts are allowed to edit the schedule.</p>
+      <form id="loginForm" class="auth-form">
+        <label>Email
+          <input id="emailInput" type="email" autocomplete="email" required>
+        </label>
+        <label>Password
+          <input id="passwordInput" type="password" autocomplete="current-password" required>
+        </label>
+        <button class="btn btn-primary" type="submit">Sign In</button>
+      </form>
+    </section>
+
+    <section id="unauthorizedCard" class="panel hidden">
+      <h2>Access Restricted</h2>
+      <p>You are signed in, but this account does not match the required email domain.</p>
+      <p>Use an <code>@afscme13.org</code> staff account.</p>
+    </section>
+
+    <section id="appShell" class="hidden">
+      <div class="admin-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Schedule Editor</h2>
+            <button id="reloadBlockBtn" class="btn btn-small">Reload</button>
+          </div>
+          <div class="row controls-row">
+            <label>Day
+              <select id="daySelect"></select>
+            </label>
+            <label>Period
+              <select id="periodSelect"></select>
+            </label>
+          </div>
+          <label>Block Title
+            <input id="blockTitleInput" type="text" maxlength="120" placeholder="Today's Events">
+          </label>
+
+          <div class="table-wrap">
+            <table class="items-table">
+              <thead>
+                <tr>
+                  <th>Room</th>
+                  <th>Start</th>
+                  <th>End</th>
+                  <th>Event</th>
+                  <th>Building</th>
+                  <th>Notes</th>
+                  <th>Show</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="itemsBody"></tbody>
+            </table>
+          </div>
+          <div class="row">
+            <button id="addRowBtn" class="btn btn-small" type="button">Add Row</button>
+          </div>
+          <div class="row action-row">
+            <button id="saveBlockBtn" class="btn btn-primary" type="button">Save Block</button>
+            <button id="clearBlockBtn" class="btn btn-danger" type="button">Clear Block</button>
+            <button id="previewBtn" class="btn" type="button">Preview Block</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Preview</h2>
+          <p id="previewLabel" class="muted">Select a day and period, then click Preview Block.</p>
+          <div id="previewContainer" class="preview-list"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Live/Test Settings</h2>
+          <p id="modeSummary" class="notice-inline">Mode: --</p>
+          <div class="settings-grid">
+            <label>
+              <input id="testModeEnabled" type="checkbox">
+              Enable Test Mode
+            </label>
+            <label>Test Timestamp
+              <input id="testTimestampInput" type="datetime-local">
+            </label>
+            <label>Test Override Day
+              <select id="testOverrideDaySelect"></select>
+            </label>
+            <label>Test Override Period
+              <select id="testOverridePeriodSelect"></select>
+            </label>
+            <label>Morning Switch Time (test)
+              <input id="testMorningSwitchInput" type="time">
+            </label>
+            <label>Evening Switch Time (test)
+              <input id="testEveningSwitchInput" type="time">
+            </label>
+            <label>Official Morning Switch
+              <input id="morningSwitchInput" type="time">
+            </label>
+            <label>Official Evening Switch
+              <input id="eveningSwitchInput" type="time">
+            </label>
+            <label>Display Refresh (seconds)
+              <input id="refreshSecondsInput" type="number" min="15" max="3600" step="1">
+            </label>
+            <label>Display Title
+              <input id="displayTitleInput" type="text" maxlength="120">
+            </label>
+          </div>
+          <div class="row action-row">
+            <button id="saveSettingsBtn" class="btn btn-primary" type="button">Save Settings</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Recent Events</h2>
+          <button id="refreshLogsBtn" class="btn btn-small" type="button">Refresh Logs</button>
+          <ul id="eventLogList" class="event-list"></ul>
+        </section>
+
+        <section class="panel danger-panel">
+          <h2>Danger Zone</h2>
+          <p>Reset all 14 day/period blocks for the current week.</p>
+          <button id="resetWeekBtn" class="btn btn-danger" type="button">Reset Full Week</button>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./js/admin.js"></script>
+</body>
+</html>
