@@ -26,6 +26,11 @@ export function settingsRowsToObject(rows) {
   }
 
   merged.test_mode_enabled = Boolean(merged.test_mode_enabled);
+  merged.test_effective_timestamp = typeof merged.test_effective_timestamp === "string"
+    ? merged.test_effective_timestamp
+    : "";
+  merged.test_morning_switch_time = merged.test_morning_switch_time || "";
+  merged.test_evening_switch_time = merged.test_evening_switch_time || "";
   return merged;
 }
 
@@ -33,7 +38,7 @@ export function toAppSettingRows(settings, actor) {
   const keys = Object.keys(DEFAULT_SETTINGS);
   return keys.map((key) => ({
     key,
-    value: settings[key] ?? null,
+    value: settings[key] === null || settings[key] === undefined ? "" : settings[key],
     updated_by: actor?.id ?? null,
     updated_by_email: actor?.email ?? null
   }));

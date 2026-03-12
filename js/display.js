@@ -1,4 +1,4 @@
-import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260312b";
+import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260312c";
 import { DEFAULT_ROOM_NAMES, DEFAULT_SETTINGS } from "./utils/constants.js";
 import { clearChildren, setVisible } from "./utils/dom.js";
 import { blockKey, formatBlockLabel, settingsRowsToObject, sortScheduleItems } from "./utils/schedule.js";
@@ -31,6 +31,8 @@ const state = {
 function normalizeRoomName(value) {
   return String(value || "").trim().toUpperCase().replace(/^ROOM\s+/i, "");
 }
+
+const DEFAULT_ROOM_CODES = new Set(DEFAULT_ROOM_NAMES.map((name) => normalizeRoomName(name)));
 
 function setStatus(text) {
   refs.statusText.textContent = text;
@@ -71,7 +73,6 @@ async function fetchBlock(dayOfWeek, period) {
         start_time_text,
         end_time_text,
         event_title,
-        building_name,
         notes,
         sort_order,
         is_visible
@@ -104,7 +105,7 @@ function renderRoomCard(roomName, item) {
   header.className = "room-head";
   const roomLabel = document.createElement("div");
   roomLabel.className = "room-label";
-  roomLabel.textContent = `Room ${roomName}`;
+  roomLabel.textContent = roomName;
   const roomTime = document.createElement("div");
   roomTime.className = "room-time";
   roomTime.textContent = item ? getItemTimeText(item) || "Time TBD" : "No Time";
@@ -114,11 +115,7 @@ function renderRoomCard(roomName, item) {
   title.className = "room-title";
   title.textContent = item?.event_title || "No meeting scheduled";
 
-  const meta = document.createElement("div");
-  meta.className = "room-meta";
-  meta.textContent = item?.building_name || "";
-
-  article.append(header, title, meta);
+  article.append(header, title);
 
   if (item?.notes) {
     const notes = document.createElement("div");
@@ -198,7 +195,7 @@ function renderSchedule(block, context) {
   const extraRooms = [];
   for (const item of items) {
     const normalized = normalizeRoomName(item.room_name);
-    if (DEFAULT_ROOM_NAMES.includes(normalized) && !defaultRoomMap.has(normalized)) {
+    if (DEFAULT_ROOM_CODES.has(normalized) && !defaultRoomMap.has(normalized)) {
       defaultRoomMap.set(normalized, item);
     } else {
       extraRooms.push(item);
@@ -206,7 +203,7 @@ function renderSchedule(block, context) {
   }
 
   for (const roomName of DEFAULT_ROOM_NAMES) {
-    refs.eventsContainer.append(renderRoomCard(roomName, defaultRoomMap.get(roomName)));
+    refs.eventsContainer.append(renderRoomCard(roomName, defaultRoomMap.get(normalizeRoomName(roomName))));
   }
 
   const extrasNode = renderExtraRooms(extraRooms);

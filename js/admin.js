@@ -1,5 +1,5 @@
 import { getSession, isAllowedEditorEmail, onAuthStateChange, signIn, signOut } from "./auth.js";
-import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260312b";
+import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260312c";
 import { DAYS, DEFAULT_ROOM_NAMES, DEFAULT_SETTINGS, PERIODS } from "./utils/constants.js";
 import { clearChildren, setMessage, setVisible } from "./utils/dom.js";
 import { formatBlockLabel, settingsRowsToObject, sortScheduleItems, toAppSettingRows } from "./utils/schedule.js";
@@ -37,8 +37,6 @@ const refs = {
   eveningSwitchInput: document.getElementById("eveningSwitchInput"),
   refreshSecondsInput: document.getElementById("refreshSecondsInput"),
   displayTitleInput: document.getElementById("displayTitleInput"),
-  logoImageUrlInput: document.getElementById("logoImageUrlInput"),
-  bannerImageUrlInput: document.getElementById("bannerImageUrlInput"),
   saveSettingsBtn: document.getElementById("saveSettingsBtn"),
   toggleLogsBtn: document.getElementById("toggleLogsBtn"),
   logsPanel: document.getElementById("logsPanel"),
@@ -88,8 +86,10 @@ function buildTextInput(value = "", placeholder = "") {
 }
 
 function normalizeRoomName(value) {
-  return String(value || "").trim().toUpperCase();
+  return String(value || "").trim().toUpperCase().replace(/^ROOM\s*/i, "");
 }
+
+const DEFAULT_ROOM_CODES = new Set(DEFAULT_ROOM_NAMES.map((name) => normalizeRoomName(name)));
 
 function addDefaultRoomRows() {
   clearChildren(refs.itemsBody);
@@ -101,11 +101,10 @@ function addDefaultRoomRows() {
 function addItemRow(item = {}) {
   const tr = document.createElement("tr");
 
-  const room = buildTextInput(item.room_name || "", "A");
+  const room = buildTextInput(item.room_name || "", "Room A");
   const startTime = buildTextInput(item.start_time_text || "", "9:00 AM");
   const endTime = buildTextInput(item.end_time_text || "", "10:00 AM");
   const eventTitle = buildTextInput(item.event_title || "", "Meeting");
-  const building = buildTextInput(item.building_name || "", "HQ");
   const notes = buildTextInput(item.notes || "", "Optional notes");
   const visible = document.createElement("input");
   visible.type = "checkbox";
@@ -115,7 +114,6 @@ function addItemRow(item = {}) {
   startTime.dataset.field = "start_time_text";
   endTime.dataset.field = "end_time_text";
   eventTitle.dataset.field = "event_title";
-  building.dataset.field = "building_name";
   notes.dataset.field = "notes";
   visible.dataset.field = "is_visible";
 
@@ -130,7 +128,7 @@ function addItemRow(item = {}) {
     }
   });
 
-  const cells = [room, startTime, endTime, eventTitle, building, notes, visible];
+  const cells = [room, startTime, endTime, eventTitle, notes, visible];
   for (const fieldElement of cells) {
     const td = document.createElement("td");
     td.append(fieldElement);
@@ -152,20 +150,19 @@ function collectItemRows() {
       const startText = row.querySelector('[data-field="start_time_text"]')?.value.trim() || "";
       const endText = row.querySelector('[data-field="end_time_text"]')?.value.trim() || "";
       const eventTitle = row.querySelector('[data-field="event_title"]')?.value.trim() || "";
-      const building = row.querySelector('[data-field="building_name"]')?.value.trim() || "";
       const notes = row.querySelector('[data-field="notes"]')?.value.trim() || "";
       const isVisible = row.querySelector('[data-field="is_visible"]')?.checked ?? true;
-      const hasContent = startText || endText || eventTitle || building || notes;
-      const isDefaultTemplateRoom = DEFAULT_ROOM_NAMES.includes(normalizeRoomName(roomName));
+      const hasContent = startText || endText || eventTitle || notes;
+      const isDefaultTemplateRoom = DEFAULT_ROOM_CODES.has(normalizeRoomName(roomName));
       const include = Boolean(hasContent || (roomName && !isDefaultTemplateRoom));
 
       return {
         include,
-        room_name: roomName || "TBD",
+        room_name: roomName || "Room TBD",
         start_time_text: startText || null,
         end_time_text: endText || null,
         event_title: eventTitle || "Open",
-        building_name: building || null,
+        building_name: null,
         notes: notes || null,
         sort_order: index,
         is_visible: isVisible
@@ -206,7 +203,9 @@ function renderSettingsForm() {
   refs.testModeEnabled.checked = Boolean(state.settings.test_mode_enabled);
   refs.testTimestampInput.value = toDatetimeLocalValue(state.settings.test_effective_timestamp);
   refs.testOverrideDaySelect.value =
-    state.settings.test_override_day_of_week === null ? "" : String(state.settings.test_override_day_of_week);
+    state.settings.test_override_day_of_week === null || state.settings.test_override_day_of_week === ""
+      ? ""
+      : String(state.settings.test_override_day_of_week);
   refs.testOverridePeriodSelect.value = state.settings.test_override_period || "";
   refs.testMorningSwitchInput.value = state.settings.test_morning_switch_time || "";
   refs.testEveningSwitchInput.value = state.settings.test_evening_switch_time || "";
@@ -214,16 +213,14 @@ function renderSettingsForm() {
   refs.eveningSwitchInput.value = state.settings.evening_switch_time || "17:00";
   refs.refreshSecondsInput.value = String(state.settings.display_refresh_seconds || 60);
   refs.displayTitleInput.value = state.settings.display_title || "Today's Events";
-  refs.logoImageUrlInput.value = state.settings.display_logo_url || "";
-  refs.bannerImageUrlInput.value = state.settings.display_banner_url || "";
 }
 
 function readSettingsForm() {
   const parsedRefresh = Number(refs.refreshSecondsInput.value || "60");
   const refreshSeconds = Number.isFinite(parsedRefresh) ? Math.min(Math.max(parsedRefresh, 15), 3600) : 60;
   const testOverrideDayRaw = refs.testOverrideDaySelect.value;
-  const testOverrideDay = testOverrideDayRaw === "" ? null : Number(testOverrideDayRaw);
-  const testOverridePeriod = refs.testOverridePeriodSelect.value || null;
+  const testOverrideDay = testOverrideDayRaw === "" ? "" : Number(testOverrideDayRaw);
+  const testOverridePeriod = refs.testOverridePeriodSelect.value || "";
 
   return {
     ...state.settings,
@@ -232,15 +229,13 @@ function readSettingsForm() {
     evening_switch_time: refs.eveningSwitchInput.value || "17:00",
     display_refresh_seconds: refreshSeconds,
     display_title: refs.displayTitleInput.value.trim() || "Today's Events",
-    display_logo_url: refs.logoImageUrlInput.value.trim() || null,
-    display_banner_url: refs.bannerImageUrlInput.value.trim() || null,
     test_mode_enabled: refs.testModeEnabled.checked,
     test_effective_timestamp: fromDatetimeLocalToIso(refs.testTimestampInput.value),
-    test_override_day_of_week: Number.isInteger(testOverrideDay) ? testOverrideDay : null,
+    test_override_day_of_week: Number.isInteger(testOverrideDay) ? testOverrideDay : "",
     test_override_period:
-      testOverridePeriod === "morning" || testOverridePeriod === "evening" ? testOverridePeriod : null,
-    test_morning_switch_time: refs.testMorningSwitchInput.value || null,
-    test_evening_switch_time: refs.testEveningSwitchInput.value || null
+      testOverridePeriod === "morning" || testOverridePeriod === "evening" ? testOverridePeriod : "",
+    test_morning_switch_time: refs.testMorningSwitchInput.value || "",
+    test_evening_switch_time: refs.testEveningSwitchInput.value || ""
   };
 }
 
@@ -266,7 +261,6 @@ async function fetchBlock(dayOfWeek, period) {
         start_time_text,
         end_time_text,
         event_title,
-        building_name,
         notes,
         sort_order,
         is_visible
@@ -331,7 +325,6 @@ function renderPreview(block, dayOfWeek, period) {
       <div class="preview-room">${item.room_name || "Room TBD"}</div>
       <div class="preview-title">${item.event_title || "Meeting"}</div>
       <div>${item.start_time_text || ""}${item.end_time_text ? ` - ${item.end_time_text}` : ""}</div>
-      <div class="muted">${item.building_name || ""}</div>
       <div class="muted">${item.notes || ""}</div>
     `;
     refs.previewContainer.append(card);

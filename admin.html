@@ -18,6 +18,7 @@
         <h1>Lobby Meeting Display Admin</h1>
       </div>
       <div class="top-actions">
+        <img class="admin-logo" src="./assets/OIP-780701157.jpg" alt="AFSCME">
         <a class="btn" href="./display.html" target="_blank" rel="noopener noreferrer">Open Display</a>
         <span id="signedInAs" class="chip hidden"></span>
         <button id="signOutBtn" class="btn hidden">Sign Out</button>
@@ -73,7 +74,6 @@
                   <th>Start</th>
                   <th>End</th>
                   <th>Event</th>
-                  <th>Building</th>
                   <th>Notes</th>
                   <th>Show</th>
                   <th></th>
@@ -133,12 +133,6 @@
             <label>Display Title
               <input id="displayTitleInput" type="text" maxlength="120">
             </label>
-            <label>Logo Image URL (optional)
-              <input id="logoImageUrlInput" type="url" placeholder="https://...">
-            </label>
-            <label>Banner Image URL (optional)
-              <input id="bannerImageUrlInput" type="url" placeholder="https://...">
-            </label>
           </div>
           <div class="row action-row">
             <button id="saveSettingsBtn" class="btn btn-primary" type="button">Save Settings</button>
@@ -165,6 +159,6 @@
     </section>
   </main>
 
-  <script type="module" src="./js/admin.js?v=20260312b"></script>
+  <script type="module" src="./js/admin.js?v=20260312c"></script>
 </body>
 </html>

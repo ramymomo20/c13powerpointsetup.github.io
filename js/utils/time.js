@@ -45,7 +45,6 @@ export function formatTimeInTimeZone(date, timeZone) {
     timeZone,
     hour: "numeric",
     minute: "2-digit",
-    second: "2-digit",
     hour12: true
   }).format(date);
 }
@@ -175,9 +174,9 @@ export function toDatetimeLocalValue(isoValue) {
 
 export function fromDatetimeLocalToIso(localValue) {
   if (!localValue) {
-    return null;
+    return "";
   }
 
   const parsed = new Date(localValue);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
 }

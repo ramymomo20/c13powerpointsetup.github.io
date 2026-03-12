@@ -2,6 +2,12 @@
   max-width: 1520px;
   margin: 0 auto;
   padding: 1.2rem;
+  background:
+    linear-gradient(145deg, rgba(43, 120, 192, 0.12), rgba(17, 158, 90, 0.12)),
+    rgba(255, 255, 255, 0.68);
+  border: 1px solid #c7d9e8;
+  border-radius: 1.2rem;
+  backdrop-filter: blur(1px);
 }
 
 .admin-top {
@@ -22,6 +28,14 @@
   display: flex;
   gap: 0.6rem;
   align-items: center;
+}
+
+.admin-logo {
+  height: 44px;
+  width: auto;
+  border-radius: 0.5rem;
+  border: 1px solid #c8d7e5;
+  background: #fff;
 }
 
 .notice {
@@ -99,7 +113,7 @@
 .items-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 860px;
+  min-width: 760px;
 }
 
 .items-table th,
