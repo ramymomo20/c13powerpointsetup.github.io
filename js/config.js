@@ -7,13 +7,11 @@ export const APP_CONFIG = Object.freeze({
 export function isPlaceholderConfig() {
   const url = (APP_CONFIG.supabaseUrl || "").trim();
   const anonKey = (APP_CONFIG.supabaseAnonKey || "").trim();
-  const hasLikelyUrl = /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(url);
-  const hasLikelyAnonKey = anonKey.split(".").length === 3;
-
-  return (
-    !hasLikelyUrl ||
-    !hasLikelyAnonKey ||
-    url.includes("YOUR_PROJECT_ID") ||
-    anonKey.includes("YOUR_SUPABASE_ANON_KEY")
-  );
+  if (!url || !anonKey) {
+    return true;
+  }
+  if (url.includes("YOUR_") || anonKey.includes("YOUR_")) {
+    return true;
+  }
+  return false;
 }

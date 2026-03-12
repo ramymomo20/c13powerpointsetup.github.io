@@ -1,4 +1,4 @@
-import { isSupabaseConfigured, supabase } from "./supabaseClient.js";
+import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260312b";
 import { DEFAULT_ROOM_NAMES, DEFAULT_SETTINGS } from "./utils/constants.js";
 import { clearChildren, setVisible } from "./utils/dom.js";
 import { blockKey, formatBlockLabel, settingsRowsToObject, sortScheduleItems } from "./utils/schedule.js";
