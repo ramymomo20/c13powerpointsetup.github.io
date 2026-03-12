@@ -1,4 +1,4 @@
-import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260312c";
+import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260312d";
 import { DEFAULT_ROOM_NAMES, DEFAULT_SETTINGS } from "./utils/constants.js";
 import { clearChildren, setVisible } from "./utils/dom.js";
 import { blockKey, formatBlockLabel, settingsRowsToObject, sortScheduleItems } from "./utils/schedule.js";
@@ -7,9 +7,6 @@ import { resolveDisplayContext } from "./utils/time.js";
 const refs = {
   fullscreenBtn: document.getElementById("fullscreenBtn"),
   title: document.getElementById("displayTitle"),
-  logoImage: document.getElementById("logoImage"),
-  bannerSection: document.getElementById("bannerSection"),
-  bannerImage: document.getElementById("bannerImage"),
   date: document.getElementById("displayDate"),
   time: document.getElementById("displayTime"),
   modeBadge: document.getElementById("modeBadge"),
@@ -101,28 +98,26 @@ function renderRoomCard(roomName, item) {
   const article = document.createElement("article");
   article.className = "room-card";
 
-  const header = document.createElement("div");
-  header.className = "room-head";
   const roomLabel = document.createElement("div");
   roomLabel.className = "room-label";
   roomLabel.textContent = roomName;
   const roomTime = document.createElement("div");
   roomTime.className = "room-time";
   roomTime.textContent = item ? getItemTimeText(item) || "Time TBD" : "No Time";
-  header.append(roomLabel, roomTime);
-
   const title = document.createElement("div");
   title.className = "room-title";
   title.textContent = item?.event_title || "No meeting scheduled";
+  const notes = document.createElement("div");
+  notes.className = "room-notes";
+  notes.textContent = item?.notes || "";
 
-  article.append(header, title);
+  article.append(roomLabel, roomTime, title, notes);
 
   if (item?.notes) {
-    const notes = document.createElement("div");
-    notes.className = "room-notes";
-    notes.textContent = item.notes;
-    article.append(notes);
-  } else if (!item) {
+    return article;
+  }
+
+  if (!item) {
     const empty = document.createElement("div");
     empty.className = "room-empty";
     empty.textContent = "Add a title and optional time in Admin.";
@@ -159,33 +154,11 @@ function renderExtraRooms(items) {
   return section;
 }
 
-function renderMediaFromSettings() {
-  const logoUrl = String(state.settings.display_logo_url || "").trim();
-  const bannerUrl = String(state.settings.display_banner_url || "").trim();
-
-  if (logoUrl) {
-    refs.logoImage.src = logoUrl;
-    setVisible(refs.logoImage, true);
-  } else {
-    refs.logoImage.removeAttribute("src");
-    setVisible(refs.logoImage, false);
-  }
-
-  if (bannerUrl) {
-    refs.bannerImage.src = bannerUrl;
-    setVisible(refs.bannerSection, true);
-  } else {
-    refs.bannerImage.removeAttribute("src");
-    setVisible(refs.bannerSection, false);
-  }
-}
-
 function renderSchedule(block, context) {
   refs.title.textContent = block?.title || state.settings.display_title || "Today's Events";
   refs.date.textContent = context.formattedDate;
   refs.time.textContent = context.formattedTime;
   setModeBadge(context.mode);
-  renderMediaFromSettings();
 
   const items = sortScheduleItems(block?.schedule_items || []);
   clearChildren(refs.eventsContainer);
