@@ -2,8 +2,21 @@
   margin: 0;
   min-height: 100vh;
   background:
-    linear-gradient(140deg, rgba(255, 255, 255, 0.5), rgba(219, 231, 246, 0.8)),
-    linear-gradient(210deg, #f2f6fc, #dbe6f4);
+    linear-gradient(140deg, rgba(255, 255, 255, 0.84), rgba(234, 247, 252, 0.74)),
+    url("../assets/afscme-gradient-og-348001557.jpg") center / cover no-repeat fixed;
+}
+
+.display-actions {
+  position: fixed;
+  top: 0.65rem;
+  right: 0.65rem;
+  z-index: 10;
+}
+
+.display-actions .btn {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: #98bdd8;
+  backdrop-filter: blur(2px);
 }
 
 .display-shell {
@@ -19,13 +32,27 @@
 .display-header {
   border-radius: 1rem;
   padding: 1rem 1.2rem;
-  background: linear-gradient(120deg, #ffffff, #eff4fb);
+  background:
+    linear-gradient(115deg, rgba(43, 120, 192, 0.13), rgba(17, 158, 90, 0.13)),
+    rgba(255, 255, 255, 0.96);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-soft);
   display: flex;
   justify-content: space-between;
   align-items: end;
   gap: 1rem;
+}
+
+.header-main {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.logo-image {
+  max-height: 64px;
+  max-width: 180px;
+  object-fit: contain;
 }
 
 .display-header h1 {
@@ -63,8 +90,8 @@
 }
 
 .mode-live {
-  background: #d7ebff;
-  color: #004f89;
+  background: #dcf0ff;
+  color: #1e5a8b;
 }
 
 .mode-test {
@@ -72,66 +99,119 @@
   color: #7f4800;
 }
 
-.events-grid {
+.rooms-grid {
+  border-radius: 0.9rem;
   display: grid;
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  gap: 0.85rem;
   align-content: start;
-  gap: 0.7rem;
-  overflow: hidden;
 }
 
-.event-card {
-  border-radius: 0.9rem;
+.room-card {
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-soft);
-  padding: 0.85rem 1rem;
+  border-radius: 0.95rem;
+  padding: 0.9rem 1rem;
+  min-height: 158px;
   display: grid;
-  grid-template-columns: minmax(160px, 210px) minmax(140px, 180px) 1fr minmax(120px, 170px);
-  gap: 0.8rem;
-  align-items: center;
+  grid-template-rows: auto auto 1fr;
+  gap: 0.4rem;
 }
 
-.event-room {
-  font-size: clamp(1.05rem, 1.45vw, 1.4rem);
+.room-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid #d2e2ed;
+  padding-bottom: 0.35rem;
+}
+
+.room-label {
+  font-size: clamp(1.05rem, 1.4vw, 1.35rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.room-time {
+  font-size: clamp(0.9rem, 1.2vw, 1.08rem);
+  font-weight: 700;
+  color: #226e9a;
+}
+
+.room-title {
+  font-size: clamp(1.1rem, 1.55vw, 1.45rem);
   font-weight: 700;
 }
 
-.event-time {
-  font-size: clamp(0.95rem, 1.2vw, 1.2rem);
-  font-weight: 700;
-  color: #1f4d73;
-}
-
-.event-title {
-  font-size: clamp(1.1rem, 1.55vw, 1.5rem);
-  font-weight: 700;
-}
-
-.event-building {
-  text-align: right;
+.room-meta {
   color: var(--muted);
   font-weight: 600;
 }
 
-.event-notes {
-  grid-column: 1 / -1;
-  color: var(--muted);
-  font-size: 0.95rem;
+.room-notes {
   margin-top: 0.2rem;
-  border-top: 1px dashed #d7deeb;
-  padding-top: 0.5rem;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.room-empty {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.extra-rooms {
+  grid-column: 1 / -1;
+  border-top: 1px dashed #c8dce9;
+  padding-top: 0.6rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.extra-rooms h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #205f86;
+}
+
+.extra-rooms-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.6rem;
+}
+
+.extra-room-item {
+  border: 1px solid #ccddea;
+  border-radius: 0.7rem;
+  padding: 0.55rem 0.65rem;
+  background: #f7fcff;
+}
+
+.banner-section {
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+}
+
+.banner-image {
+  width: 100%;
+  max-height: 190px;
+  object-fit: cover;
+  display: block;
 }
 
 .empty-state {
   border-radius: 1rem;
-  border: 1px dashed #b8c7dc;
-  background: #f8fbff;
+  border: 1px dashed #b7cee2;
+  background: #f4faff;
   padding: 1.2rem;
   text-align: center;
 }
 
 .display-footer {
-  border-top: 1px solid #ced9e8;
+  border-top: 1px solid #c6d9e9;
   color: var(--muted);
   display: flex;
   justify-content: space-between;
@@ -154,13 +234,13 @@
     text-align: left;
   }
 
-  .event-card {
+  .rooms-grid {
     grid-template-columns: 1fr;
-    gap: 0.4rem;
   }
 
-  .event-building {
-    text-align: left;
+  .display-actions {
+    top: 0.35rem;
+    right: 0.35rem;
   }
 
   .display-footer {

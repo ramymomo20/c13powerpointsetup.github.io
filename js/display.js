@@ -1,11 +1,15 @@
 import { isSupabaseConfigured, supabase } from "./supabaseClient.js";
-import { DEFAULT_SETTINGS } from "./utils/constants.js";
+import { DEFAULT_ROOM_NAMES, DEFAULT_SETTINGS } from "./utils/constants.js";
 import { clearChildren, setVisible } from "./utils/dom.js";
 import { blockKey, formatBlockLabel, settingsRowsToObject, sortScheduleItems } from "./utils/schedule.js";
 import { resolveDisplayContext } from "./utils/time.js";
 
 const refs = {
+  fullscreenBtn: document.getElementById("fullscreenBtn"),
   title: document.getElementById("displayTitle"),
+  logoImage: document.getElementById("logoImage"),
+  bannerSection: document.getElementById("bannerSection"),
+  bannerImage: document.getElementById("bannerImage"),
   date: document.getElementById("displayDate"),
   time: document.getElementById("displayTime"),
   modeBadge: document.getElementById("modeBadge"),
@@ -24,6 +28,10 @@ const state = {
   isLoading: false
 };
 
+function normalizeRoomName(value) {
+  return String(value || "").trim().toUpperCase().replace(/^ROOM\s+/i, "");
+}
+
 function setStatus(text) {
   refs.statusText.textContent = text;
 }
@@ -35,7 +43,7 @@ function setModeBadge(mode) {
 }
 
 function showConfigError() {
-  setStatus("Supabase is not configured. Update js/config.js with your project URL and anon key.");
+  setStatus("Supabase config missing or stale. Confirm js/config.js and hard refresh the page (Ctrl+F5).");
   refs.activeBlockText.textContent = "Block: --";
   refs.lastRefreshText.textContent = "Refresh: --";
 }
@@ -82,38 +90,97 @@ async function fetchBlock(dayOfWeek, period) {
   return data;
 }
 
-function renderEventItem(item) {
+function getItemTimeText(item) {
+  const start = String(item.start_time_text || "").trim();
+  const end = String(item.end_time_text || "").trim();
+  return start && end ? `${start} - ${end}` : start || end || "";
+}
+
+function renderRoomCard(roomName, item) {
   const article = document.createElement("article");
-  article.className = "event-card";
+  article.className = "room-card";
 
-  const room = document.createElement("div");
-  room.className = "event-room";
-  room.textContent = item.room_name || "Room TBD";
-
-  const time = document.createElement("div");
-  time.className = "event-time";
-  const start = item.start_time_text?.trim();
-  const end = item.end_time_text?.trim();
-  time.textContent = start && end ? `${start} - ${end}` : start || end || "Time TBD";
+  const header = document.createElement("div");
+  header.className = "room-head";
+  const roomLabel = document.createElement("div");
+  roomLabel.className = "room-label";
+  roomLabel.textContent = `Room ${roomName}`;
+  const roomTime = document.createElement("div");
+  roomTime.className = "room-time";
+  roomTime.textContent = item ? getItemTimeText(item) || "Time TBD" : "No Time";
+  header.append(roomLabel, roomTime);
 
   const title = document.createElement("div");
-  title.className = "event-title";
-  title.textContent = item.event_title || "Meeting";
+  title.className = "room-title";
+  title.textContent = item?.event_title || "No meeting scheduled";
 
-  const building = document.createElement("div");
-  building.className = "event-building";
-  building.textContent = item.building_name || "";
+  const meta = document.createElement("div");
+  meta.className = "room-meta";
+  meta.textContent = item?.building_name || "";
 
-  article.append(room, time, title, building);
+  article.append(header, title, meta);
 
-  if (item.notes) {
+  if (item?.notes) {
     const notes = document.createElement("div");
-    notes.className = "event-notes";
+    notes.className = "room-notes";
     notes.textContent = item.notes;
     article.append(notes);
+  } else if (!item) {
+    const empty = document.createElement("div");
+    empty.className = "room-empty";
+    empty.textContent = "Add a title and optional time in Admin.";
+    article.append(empty);
   }
 
   return article;
+}
+
+function renderExtraRooms(items) {
+  if (!items.length) {
+    return null;
+  }
+  const section = document.createElement("section");
+  section.className = "extra-rooms";
+  const heading = document.createElement("h3");
+  heading.textContent = "Additional Rooms";
+  const list = document.createElement("div");
+  list.className = "extra-rooms-list";
+
+  for (const item of items) {
+    const row = document.createElement("article");
+    row.className = "extra-room-item";
+    row.innerHTML = `
+      <strong>${item.room_name || "Room"}</strong>
+      <div>${item.event_title || "Meeting"}</div>
+      <div>${getItemTimeText(item) || "Time TBD"}</div>
+      <div>${item.notes || ""}</div>
+    `;
+    list.append(row);
+  }
+
+  section.append(heading, list);
+  return section;
+}
+
+function renderMediaFromSettings() {
+  const logoUrl = String(state.settings.display_logo_url || "").trim();
+  const bannerUrl = String(state.settings.display_banner_url || "").trim();
+
+  if (logoUrl) {
+    refs.logoImage.src = logoUrl;
+    setVisible(refs.logoImage, true);
+  } else {
+    refs.logoImage.removeAttribute("src");
+    setVisible(refs.logoImage, false);
+  }
+
+  if (bannerUrl) {
+    refs.bannerImage.src = bannerUrl;
+    setVisible(refs.bannerSection, true);
+  } else {
+    refs.bannerImage.removeAttribute("src");
+    setVisible(refs.bannerSection, false);
+  }
 }
 
 function renderSchedule(block, context) {
@@ -121,17 +188,30 @@ function renderSchedule(block, context) {
   refs.date.textContent = context.formattedDate;
   refs.time.textContent = context.formattedTime;
   setModeBadge(context.mode);
+  renderMediaFromSettings();
 
   const items = sortScheduleItems(block?.schedule_items || []);
   clearChildren(refs.eventsContainer);
+  setVisible(refs.emptyState, false);
 
-  if (!items.length) {
-    setVisible(refs.emptyState, true);
-  } else {
-    setVisible(refs.emptyState, false);
-    for (const item of items) {
-      refs.eventsContainer.append(renderEventItem(item));
+  const defaultRoomMap = new Map();
+  const extraRooms = [];
+  for (const item of items) {
+    const normalized = normalizeRoomName(item.room_name);
+    if (DEFAULT_ROOM_NAMES.includes(normalized) && !defaultRoomMap.has(normalized)) {
+      defaultRoomMap.set(normalized, item);
+    } else {
+      extraRooms.push(item);
     }
+  }
+
+  for (const roomName of DEFAULT_ROOM_NAMES) {
+    refs.eventsContainer.append(renderRoomCard(roomName, defaultRoomMap.get(roomName)));
+  }
+
+  const extrasNode = renderExtraRooms(extraRooms);
+  if (extrasNode) {
+    refs.eventsContainer.append(extrasNode);
   }
 }
 
@@ -181,6 +261,19 @@ function ensureRefreshTimer(seconds) {
   }, seconds * 1000);
 }
 
+function updateFullscreenButtonText() {
+  refs.fullscreenBtn.textContent = document.fullscreenElement ? "Exit Fullscreen" : "Enter Fullscreen";
+}
+
+async function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    await document.documentElement.requestFullscreen();
+  } else {
+    await document.exitFullscreen();
+  }
+  updateFullscreenButtonText();
+}
+
 async function runRefreshCycle() {
   if (state.isLoading) {
     return;
@@ -213,6 +306,18 @@ async function runRefreshCycle() {
 }
 
 async function init() {
+  refs.fullscreenBtn.addEventListener("click", () => {
+    toggleFullscreen().catch((error) => {
+      setStatus(`Fullscreen failed: ${error?.message || "unknown error"}`);
+    });
+  });
+  document.addEventListener("fullscreenchange", updateFullscreenButtonText);
+  document.addEventListener("keydown", (event) => {
+    if (event.key.toLowerCase() === "f") {
+      toggleFullscreen().catch(() => undefined);
+    }
+  });
+
   if (!isSupabaseConfigured()) {
     showConfigError();
     return;

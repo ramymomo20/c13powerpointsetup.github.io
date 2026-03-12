@@ -10,6 +10,12 @@
   gap: 1rem;
   align-items: end;
   margin-bottom: 1rem;
+  border-radius: 1rem;
+  border: 1px solid #c8daea;
+  background:
+    linear-gradient(120deg, rgba(43, 120, 192, 0.1), rgba(17, 158, 90, 0.12)),
+    #ffffff;
+  padding: 0.85rem 1rem;
 }
 
 .top-actions {
@@ -19,10 +25,10 @@
 }
 
 .notice {
-  border: 1px solid #bfd1e8;
+  border: 1px solid #b9d5e9;
   border-radius: 0.75rem;
-  background: #eaf3ff;
-  color: #123e67;
+  background: #ecf5ff;
+  color: #1f4967;
   padding: 0.65rem 0.8rem;
   margin-bottom: 1rem;
 }
@@ -42,7 +48,7 @@
 .panel {
   border-radius: 1rem;
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: linear-gradient(170deg, #ffffff, #f4fafc);
   box-shadow: var(--shadow-soft);
   padding: 1rem;
 }
@@ -119,10 +125,10 @@
 }
 
 .preview-item {
-  border: 1px solid #d6dfec;
+  border: 1px solid #c9dceb;
   border-radius: 0.7rem;
   padding: 0.6rem;
-  background: #fafcff;
+  background: #f8fcff;
 }
 
 .preview-room {
@@ -135,9 +141,9 @@
 }
 
 .notice-inline {
-  border: 1px solid #d6e3f2;
+  border: 1px solid #c6d9e9;
   border-radius: 0.7rem;
-  background: #f1f7ff;
+  background: linear-gradient(130deg, #eef6ff, #eefaf3);
   padding: 0.55rem 0.65rem;
 }
 
@@ -145,6 +151,19 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(210px, 1fr));
   gap: 0.7rem;
+}
+
+.checkline {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 700;
+  margin-top: 1.55rem;
+}
+
+.checkline input[type="checkbox"] {
+  width: auto;
+  margin: 0;
 }
 
 .event-list {
@@ -158,9 +177,9 @@
 }
 
 .event-list li {
-  border: 1px solid #d6dfea;
+  border: 1px solid #cadbea;
   border-radius: 0.6rem;
-  background: #fafcff;
+  background: #f7fcff;
   padding: 0.45rem 0.55rem;
   font-size: 0.92rem;
 }

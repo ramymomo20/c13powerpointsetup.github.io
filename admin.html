@@ -18,6 +18,7 @@
         <h1>Lobby Meeting Display Admin</h1>
       </div>
       <div class="top-actions">
+        <a class="btn" href="./display.html" target="_blank" rel="noopener noreferrer">Open Display</a>
         <span id="signedInAs" class="chip hidden"></span>
         <button id="signOutBtn" class="btn hidden">Sign Out</button>
       </div>
@@ -101,7 +102,7 @@
           <h2>Live/Test Settings</h2>
           <p id="modeSummary" class="notice-inline">Mode: --</p>
           <div class="settings-grid">
-            <label>
+            <label class="checkline">
               <input id="testModeEnabled" type="checkbox">
               Enable Test Mode
             </label>
@@ -132,6 +133,12 @@
             <label>Display Title
               <input id="displayTitleInput" type="text" maxlength="120">
             </label>
+            <label>Logo Image URL (optional)
+              <input id="logoImageUrlInput" type="url" placeholder="https://...">
+            </label>
+            <label>Banner Image URL (optional)
+              <input id="bannerImageUrlInput" type="url" placeholder="https://...">
+            </label>
           </div>
           <div class="row action-row">
             <button id="saveSettingsBtn" class="btn btn-primary" type="button">Save Settings</button>
@@ -139,9 +146,14 @@
         </section>
 
         <section class="panel">
-          <h2>Recent Events</h2>
-          <button id="refreshLogsBtn" class="btn btn-small" type="button">Refresh Logs</button>
-          <ul id="eventLogList" class="event-list"></ul>
+          <div class="panel-head">
+            <h2>Recent Events</h2>
+            <button id="toggleLogsBtn" class="btn btn-small" type="button">Show Events</button>
+          </div>
+          <div id="logsPanel" class="hidden">
+            <button id="refreshLogsBtn" class="btn btn-small" type="button">Refresh Logs</button>
+            <ul id="eventLogList" class="event-list"></ul>
+          </div>
         </section>
 
         <section class="panel danger-panel">

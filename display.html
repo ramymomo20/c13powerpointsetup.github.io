@@ -11,11 +11,17 @@
   <link rel="stylesheet" href="./css/display.css">
 </head>
 <body class="display-body">
+  <div class="display-actions">
+    <button id="fullscreenBtn" class="btn btn-small" type="button">Enter Fullscreen</button>
+  </div>
   <main class="display-shell">
     <header class="display-header">
-      <div>
+      <div class="header-main">
+        <img id="logoImage" class="logo-image hidden" alt="AFSCME logo">
+        <div>
         <p class="eyebrow">AFSCME Council 13</p>
         <h1 id="displayTitle">Today's Events</h1>
+        </div>
       </div>
       <div class="header-meta">
         <p id="displayDate" class="meta-date">--</p>
@@ -24,7 +30,11 @@
       </div>
     </header>
 
-    <section id="eventsContainer" class="events-grid" aria-live="polite"></section>
+    <section id="bannerSection" class="banner-section hidden">
+      <img id="bannerImage" class="banner-image" alt="Display banner">
+    </section>
+
+    <section id="eventsContainer" class="rooms-grid" aria-live="polite"></section>
 
     <section id="emptyState" class="empty-state hidden">
       <h2>No meetings scheduled</h2>

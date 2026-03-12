@@ -1,6 +1,6 @@
 import { getSession, isAllowedEditorEmail, onAuthStateChange, signIn, signOut } from "./auth.js";
 import { isSupabaseConfigured, supabase } from "./supabaseClient.js";
-import { DAYS, DEFAULT_SETTINGS, PERIODS } from "./utils/constants.js";
+import { DAYS, DEFAULT_ROOM_NAMES, DEFAULT_SETTINGS, PERIODS } from "./utils/constants.js";
 import { clearChildren, setMessage, setVisible } from "./utils/dom.js";
 import { formatBlockLabel, settingsRowsToObject, sortScheduleItems, toAppSettingRows } from "./utils/schedule.js";
 import { fromDatetimeLocalToIso, resolveDisplayContext, toDatetimeLocalValue } from "./utils/time.js";
@@ -37,7 +37,11 @@ const refs = {
   eveningSwitchInput: document.getElementById("eveningSwitchInput"),
   refreshSecondsInput: document.getElementById("refreshSecondsInput"),
   displayTitleInput: document.getElementById("displayTitleInput"),
+  logoImageUrlInput: document.getElementById("logoImageUrlInput"),
+  bannerImageUrlInput: document.getElementById("bannerImageUrlInput"),
   saveSettingsBtn: document.getElementById("saveSettingsBtn"),
+  toggleLogsBtn: document.getElementById("toggleLogsBtn"),
+  logsPanel: document.getElementById("logsPanel"),
   refreshLogsBtn: document.getElementById("refreshLogsBtn"),
   eventLogList: document.getElementById("eventLogList"),
   resetWeekBtn: document.getElementById("resetWeekBtn")
@@ -83,10 +87,21 @@ function buildTextInput(value = "", placeholder = "") {
   return input;
 }
 
+function normalizeRoomName(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function addDefaultRoomRows() {
+  clearChildren(refs.itemsBody);
+  for (const roomName of DEFAULT_ROOM_NAMES) {
+    addItemRow({ room_name: roomName, is_visible: true });
+  }
+}
+
 function addItemRow(item = {}) {
   const tr = document.createElement("tr");
 
-  const room = buildTextInput(item.room_name || "", "Room 1");
+  const room = buildTextInput(item.room_name || "", "A");
   const startTime = buildTextInput(item.start_time_text || "", "9:00 AM");
   const endTime = buildTextInput(item.end_time_text || "", "10:00 AM");
   const eventTitle = buildTextInput(item.event_title || "", "Meeting");
@@ -111,7 +126,7 @@ function addItemRow(item = {}) {
   removeBtn.addEventListener("click", () => {
     tr.remove();
     if (!refs.itemsBody.children.length) {
-      addItemRow();
+      addDefaultRoomRows();
     }
   });
 
@@ -140,21 +155,24 @@ function collectItemRows() {
       const building = row.querySelector('[data-field="building_name"]')?.value.trim() || "";
       const notes = row.querySelector('[data-field="notes"]')?.value.trim() || "";
       const isVisible = row.querySelector('[data-field="is_visible"]')?.checked ?? true;
-      const hasAnyText = roomName || startText || endText || eventTitle || building || notes;
+      const hasContent = startText || endText || eventTitle || building || notes;
+      const isDefaultTemplateRoom = DEFAULT_ROOM_NAMES.includes(normalizeRoomName(roomName));
+      const include = Boolean(hasContent || (roomName && !isDefaultTemplateRoom));
 
       return {
-        include: hasAnyText,
-        room_name: roomName,
+        include,
+        room_name: roomName || "TBD",
         start_time_text: startText || null,
         end_time_text: endText || null,
-        event_title: eventTitle || "Meeting",
+        event_title: eventTitle || "Open",
         building_name: building || null,
         notes: notes || null,
         sort_order: index,
         is_visible: isVisible
       };
     })
-    .filter((row) => row.include);
+    .filter((row) => row.include)
+    .map(({ include, ...item }) => item);
 }
 
 function setLoadingButtons(disabled) {
@@ -164,12 +182,15 @@ function setLoadingButtons(disabled) {
     refs.previewBtn,
     refs.reloadBlockBtn,
     refs.saveSettingsBtn,
+    refs.toggleLogsBtn,
     refs.refreshLogsBtn,
     refs.resetWeekBtn,
     refs.addRowBtn
   ];
   for (const button of buttons) {
-    button.disabled = disabled;
+    if (button) {
+      button.disabled = disabled;
+    }
   }
 }
 
@@ -193,6 +214,8 @@ function renderSettingsForm() {
   refs.eveningSwitchInput.value = state.settings.evening_switch_time || "17:00";
   refs.refreshSecondsInput.value = String(state.settings.display_refresh_seconds || 60);
   refs.displayTitleInput.value = state.settings.display_title || "Today's Events";
+  refs.logoImageUrlInput.value = state.settings.display_logo_url || "";
+  refs.bannerImageUrlInput.value = state.settings.display_banner_url || "";
 }
 
 function readSettingsForm() {
@@ -209,6 +232,8 @@ function readSettingsForm() {
     evening_switch_time: refs.eveningSwitchInput.value || "17:00",
     display_refresh_seconds: refreshSeconds,
     display_title: refs.displayTitleInput.value.trim() || "Today's Events",
+    display_logo_url: refs.logoImageUrlInput.value.trim() || null,
+    display_banner_url: refs.bannerImageUrlInput.value.trim() || null,
     test_mode_enabled: refs.testModeEnabled.checked,
     test_effective_timestamp: fromDatetimeLocalToIso(refs.testTimestampInput.value),
     test_override_day_of_week: Number.isInteger(testOverrideDay) ? testOverrideDay : null,
@@ -264,12 +289,18 @@ function renderEditorBlock(block) {
 
   const items = [...(block?.schedule_items || [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   if (!items.length) {
-    addItemRow();
+    addDefaultRoomRows();
     return;
   }
 
+  const existingRooms = new Set(items.map((item) => normalizeRoomName(item.room_name)));
   for (const item of items) {
     addItemRow(item);
+  }
+  for (const roomName of DEFAULT_ROOM_NAMES) {
+    if (!existingRooms.has(normalizeRoomName(roomName))) {
+      addItemRow({ room_name: roomName, is_visible: true });
+    }
   }
 }
 
@@ -382,8 +413,7 @@ async function clearSelectedBlock() {
   }
 
   refs.blockTitleInput.value = state.settings.display_title || "Today's Events";
-  clearChildren(refs.itemsBody);
-  addItemRow();
+  addDefaultRoomRows();
   await saveSelectedBlock();
   await previewSelectedBlock();
   showMessage("Block cleared.", "info");
@@ -433,6 +463,22 @@ async function refreshLogs() {
   }
 }
 
+async function refreshLogsIfVisible() {
+  if (refs.logsPanel.classList.contains("hidden")) {
+    return;
+  }
+  await refreshLogs();
+}
+
+async function toggleLogsPanel() {
+  const shouldShow = refs.logsPanel.classList.contains("hidden");
+  setVisible(refs.logsPanel, shouldShow);
+  refs.toggleLogsBtn.textContent = shouldShow ? "Hide Events" : "Show Events";
+  if (shouldShow) {
+    await refreshLogs();
+  }
+}
+
 async function resetWeek() {
   const confirmed = window.confirm("Reset all 14 blocks and remove all schedule rows?");
   if (!confirmed) {
@@ -469,7 +515,7 @@ async function resetWeek() {
   await writeEventLog("schedule_updated", { full_week_reset: true }).catch(() => undefined);
   await loadSelectedBlock();
   await previewSelectedBlock();
-  await refreshLogs();
+  await refreshLogsIfVisible();
 }
 
 async function bootstrapEditor() {
@@ -482,7 +528,8 @@ async function bootstrapEditor() {
 
   await loadSelectedBlock();
   await previewSelectedBlock();
-  await refreshLogs();
+  setVisible(refs.logsPanel, false);
+  refs.toggleLogsBtn.textContent = "Show Events";
   renderModeSummary();
 
   if (state.modeSummaryTimer) {
@@ -560,11 +607,15 @@ function attachHandlers() {
   });
 
   refs.daySelect.addEventListener("change", () => {
-    loadSelectedBlock().catch((error) => showMessage(error.message, "error"));
+    loadSelectedBlock()
+      .then(() => previewSelectedBlock())
+      .catch((error) => showMessage(error.message, "error"));
   });
 
   refs.periodSelect.addEventListener("change", () => {
-    loadSelectedBlock().catch((error) => showMessage(error.message, "error"));
+    loadSelectedBlock()
+      .then(() => previewSelectedBlock())
+      .catch((error) => showMessage(error.message, "error"));
   });
 
   refs.addRowBtn.addEventListener("click", () => addItemRow());
@@ -573,7 +624,7 @@ function attachHandlers() {
     setLoadingButtons(true);
     saveSelectedBlock()
       .then(() => previewSelectedBlock())
-      .then(() => refreshLogs())
+      .then(() => refreshLogsIfVisible())
       .then(() => showMessage("Block saved.", "success"))
       .catch((error) => showMessage(`Save failed: ${error?.message || "unknown"}`, "error"))
       .finally(() => setLoadingButtons(false));
@@ -582,7 +633,7 @@ function attachHandlers() {
   refs.clearBlockBtn.addEventListener("click", () => {
     setLoadingButtons(true);
     clearSelectedBlock()
-      .then(() => refreshLogs())
+      .then(() => refreshLogsIfVisible())
       .catch((error) => showMessage(`Clear failed: ${error?.message || "unknown"}`, "error"))
       .finally(() => setLoadingButtons(false));
   });
@@ -597,10 +648,14 @@ function attachHandlers() {
   refs.saveSettingsBtn.addEventListener("click", () => {
     setLoadingButtons(true);
     saveSettings()
-      .then(() => refreshLogs())
+      .then(() => refreshLogsIfVisible())
       .then(() => showMessage("Settings saved.", "success"))
       .catch((error) => showMessage(`Settings save failed: ${error?.message || "unknown"}`, "error"))
       .finally(() => setLoadingButtons(false));
+  });
+
+  refs.toggleLogsBtn.addEventListener("click", () => {
+    toggleLogsPanel().catch((error) => showMessage(`Logs failed: ${error?.message || "unknown"}`, "error"));
   });
 
   refs.refreshLogsBtn.addEventListener("click", () => {

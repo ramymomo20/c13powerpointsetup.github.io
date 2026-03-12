@@ -13,12 +13,16 @@ export const PERIODS = [
   { value: "evening", label: "Evening" }
 ];
 
+export const DEFAULT_ROOM_NAMES = ["A", "B", "C", "D", "E", "G"];
+
 export const DEFAULT_SETTINGS = Object.freeze({
   display_timezone: "America/New_York",
   morning_switch_time: "05:00",
   evening_switch_time: "17:00",
   display_refresh_seconds: 60,
   display_title: "Today's Events",
+  display_logo_url: null,
+  display_banner_url: "./assets/afscme-gradient-og-348001557.jpg",
   test_mode_enabled: false,
   test_effective_timestamp: null,
   test_override_day_of_week: null,

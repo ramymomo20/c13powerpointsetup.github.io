@@ -7,10 +7,12 @@ export const APP_CONFIG = Object.freeze({
 export function isPlaceholderConfig() {
   const url = (APP_CONFIG.supabaseUrl || "").trim();
   const anonKey = (APP_CONFIG.supabaseAnonKey || "").trim();
+  const hasLikelyUrl = /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(url);
+  const hasLikelyAnonKey = anonKey.split(".").length === 3;
 
   return (
-    !url ||
-    !anonKey ||
+    !hasLikelyUrl ||
+    !hasLikelyAnonKey ||
     url.includes("hbvjlwschtjmctrirveg") ||
     anonKey.includes("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhidmpsd3NjaHRqbWN0cmlydmVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNDQ4NzksImV4cCI6MjA4ODkyMDg3OX0.G6MyBZRST5MkiMqgE4sOEhg720R0NDRwWGNZGjMljoU")
   );
