@@ -1,5 +1,5 @@
-import { getSession, isAllowedEditorEmail, onAuthStateChange, signIn, signOut } from "./auth.js?v=20260313d";
-import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313d";
+import { getSession, isAllowedEditorEmail, onAuthStateChange, signIn, signOut } from "./auth.js?v=20260313e";
+import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313e";
 import { DAYS, DEFAULT_ROOM_NAMES, DEFAULT_SETTINGS, PERIODS } from "./utils/constants.js";
 import { clearChildren, setMessage, setVisible } from "./utils/dom.js";
 import { formatBlockLabel, settingsRowsToObject, sortScheduleItems, toAppSettingRows } from "./utils/schedule.js";
@@ -819,7 +819,7 @@ function attachHandlers() {
       })
       .catch((error) => {
         resetButtonState(refs.saveSettingsBtn);
-        showMessage(`Settings save failed: ${error?.message || "unknown"}`, "error"));
+        showMessage(`Settings save failed: ${error?.message || "unknown"}`, "error");
       })
       .finally(() => setLoadingButtons(false));
   });
