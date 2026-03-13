@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Libre+Franklin:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./css/base.css?v=20260313g">
-  <link rel="stylesheet" href="./css/admin.css?v=20260313g">
+  <link rel="stylesheet" href="./css/base.css?v=20260313h">
+  <link rel="stylesheet" href="./css/admin.css?v=20260313h">
 </head>
 <body>
   <main class="admin-wrap">
@@ -97,7 +97,7 @@
 
         <section class="panel">
           <h2>Preview</h2>
-          <p id="previewLabel" class="muted">Select a day and period, then click Preview Block.</p>
+          <p id="previewLabel" class="muted">Select a day and period to preview the current block.</p>
           <div id="previewContainer" class="preview-list"></div>
         </section>
 
@@ -114,7 +114,20 @@
             <label>Display Title
               <input id="displayTitleInput" type="text" maxlength="120">
             </label>
+            <label>Logo Image URL or Asset Path
+              <input id="displayLogoUrlInput" type="text" placeholder="./assets/AFSCME-Logo-112531210.png">
+            </label>
+            <label>Logo Image File
+              <input id="displayLogoFileInput" type="file" accept="image/*">
+            </label>
+            <label>Photo Image URL or Asset Path
+              <input id="displayPhotoUrlInput" type="text" placeholder="https://example.com/photo.jpg">
+            </label>
+            <label>Photo Image File
+              <input id="displayPhotoFileInput" type="file" accept="image/*">
+            </label>
           </div>
+          <p class="muted">Use an internet image URL, a repo asset path like <code>./assets/image.png</code>, or choose a file to store directly in settings.</p>
           <div class="row">
             <button id="toggleTestToolsBtn" class="btn btn-small" type="button">Show Test Tools</button>
           </div>
@@ -167,6 +180,6 @@
     </section>
   </main>
 
-  <script type="module" src="./js/admin.js?v=20260313g"></script>
+  <script type="module" src="./js/admin.js?v=20260313h"></script>
 </body>
 </html>

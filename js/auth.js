@@ -1,5 +1,5 @@
-import { APP_CONFIG } from "./config.js?v=20260313f";
-import { supabase } from "./supabaseClient.js?v=20260313f";
+import { APP_CONFIG } from "./config.js?v=20260313h";
+import { supabase } from "./supabaseClient.js?v=20260313h";
 
 export function isAllowedEditorEmail(email) {
   if (!email || typeof email !== "string") {

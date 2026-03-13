@@ -1,5 +1,5 @@
-import { getSession, isAllowedEditorEmail, onAuthStateChange, signIn, signOut } from "./auth.js?v=20260313f";
-import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313f";
+import { getSession, isAllowedEditorEmail, onAuthStateChange, signIn, signOut } from "./auth.js?v=20260313h";
+import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313h";
 import { DAYS, DEFAULT_ROOM_NAMES, DEFAULT_SETTINGS, PERIODS } from "./utils/constants.js";
 import { clearChildren, setMessage, setVisible } from "./utils/dom.js";
 import { formatBlockLabel, settingsRowsToObject, sortScheduleItems, toAppSettingRows } from "./utils/schedule.js";
@@ -45,6 +45,10 @@ const refs = {
   morningSwitchInput: document.getElementById("morningSwitchInput"),
   eveningSwitchInput: document.getElementById("eveningSwitchInput"),
   displayTitleInput: document.getElementById("displayTitleInput"),
+  displayLogoUrlInput: document.getElementById("displayLogoUrlInput"),
+  displayLogoFileInput: document.getElementById("displayLogoFileInput"),
+  displayPhotoUrlInput: document.getElementById("displayPhotoUrlInput"),
+  displayPhotoFileInput: document.getElementById("displayPhotoFileInput"),
   saveSettingsBtn: document.getElementById("saveSettingsBtn"),
   toggleTestToolsBtn: document.getElementById("toggleTestToolsBtn"),
   testToolsPanel: document.getElementById("testToolsPanel"),
@@ -307,6 +311,8 @@ function renderSettingsForm() {
   refs.morningSwitchInput.value = state.settings.morning_switch_time || "05:00";
   refs.eveningSwitchInput.value = state.settings.evening_switch_time || "17:00";
   refs.displayTitleInput.value = state.settings.display_title || "Today's Events";
+  refs.displayLogoUrlInput.value = state.settings.display_logo_url || "";
+  refs.displayPhotoUrlInput.value = state.settings.display_photo_url || "";
   populateSelects();
 }
 
@@ -323,6 +329,8 @@ function readSettingsForm() {
     display_refresh_seconds: state.settings.display_refresh_seconds || 60,
     display_title: refs.displayTitleInput.value.trim() || "Today's Events",
     display_week_start_date: state.settings.display_week_start_date || getRepresentedWeekStartYmd(state.settings, new Date()),
+    display_logo_url: refs.displayLogoUrlInput.value.trim(),
+    display_photo_url: refs.displayPhotoUrlInput.value.trim(),
     test_mode_enabled: refs.testModeEnabled.checked,
     test_effective_timestamp: fromDatetimeLocalToIso(refs.testTimestampInput.value),
     test_override_day_of_week: Number.isInteger(testOverrideDay) ? testOverrideDay : "",
@@ -331,6 +339,15 @@ function readSettingsForm() {
     test_morning_switch_time: refs.testMorningSwitchInput.value || "",
     test_evening_switch_time: refs.testEveningSwitchInput.value || ""
   };
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Unable to read image file."));
+    reader.readAsDataURL(file);
+  });
 }
 
 function renderModeSummary() {
@@ -826,6 +843,32 @@ function attachHandlers() {
 
   refs.toggleTestToolsBtn.addEventListener("click", () => {
     toggleTestToolsPanel();
+  });
+
+  refs.displayLogoFileInput.addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    readFileAsDataUrl(file)
+      .then((dataUrl) => {
+        refs.displayLogoUrlInput.value = dataUrl;
+        showMessage("Logo image loaded into settings form. Click Save Settings to publish it.", "success");
+      })
+      .catch((error) => showMessage(error.message, "error"));
+  });
+
+  refs.displayPhotoFileInput.addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    readFileAsDataUrl(file)
+      .then((dataUrl) => {
+        refs.displayPhotoUrlInput.value = dataUrl;
+        showMessage("Photo image loaded into settings form. Click Save Settings to publish it.", "success");
+      })
+      .catch((error) => showMessage(error.message, "error"));
   });
 
   refs.toggleLogsBtn.addEventListener("click", () => {

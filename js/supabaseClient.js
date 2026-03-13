@@ -1,5 +1,5 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-import { APP_CONFIG, isPlaceholderConfig } from "./config.js?v=20260313f";
+import { APP_CONFIG, isPlaceholderConfig } from "./config.js?v=20260313h";
 
 export const supabase = isPlaceholderConfig()
   ? null

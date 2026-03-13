@@ -26,6 +26,8 @@ export function settingsRowsToObject(rows) {
   }
 
   merged.test_mode_enabled = Boolean(merged.test_mode_enabled);
+  merged.display_logo_url = typeof merged.display_logo_url === "string" ? merged.display_logo_url : "";
+  merged.display_photo_url = typeof merged.display_photo_url === "string" ? merged.display_photo_url : "";
   merged.test_effective_timestamp = typeof merged.test_effective_timestamp === "string"
     ? merged.test_effective_timestamp
     : "";
