@@ -183,3 +183,72 @@ export function fromDatetimeLocalToIso(localValue) {
   const parsed = new Date(localValue);
   return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
 }
+
+export function formatYmdInTimeZone(date, timeZone) {
+  const parts = getTimeZoneClockParts(date, timeZone);
+  return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
+export function parseYmdToUtcDate(ymdValue) {
+  if (!ymdValue || typeof ymdValue !== "string") {
+    return null;
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymdValue.trim());
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+export function getWeekStartYmd(date, timeZone) {
+  const parts = getTimeZoneClockParts(date, timeZone);
+  const sundayTime = date.getTime() - parts.dayOfWeek * 24 * 60 * 60 * 1000;
+  return formatYmdInTimeZone(new Date(sundayTime), timeZone);
+}
+
+export function getRepresentedWeekStartYmd(settings, referenceDate = new Date()) {
+  const timeZone = settings.display_timezone || "America/New_York";
+  return settings.display_week_start_date || getWeekStartYmd(referenceDate, timeZone);
+}
+
+export function getRepresentedWeekDates(settings, referenceDate = new Date()) {
+  const timeZone = settings.display_timezone || "America/New_York";
+  const startYmd = getRepresentedWeekStartYmd(settings, referenceDate);
+  const startDate = parseYmdToUtcDate(startYmd) || parseYmdToUtcDate(getWeekStartYmd(referenceDate, timeZone));
+  const result = [];
+
+  for (let i = 0; i < 7; i += 1) {
+    const date = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
+    result.push({
+      dayOfWeek: i,
+      ymd: formatYmdInTimeZone(date, timeZone),
+      weekdayShort: new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        weekday: "short"
+      }).format(date),
+      weekdayLong: new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        weekday: "long"
+      }).format(date),
+      monthDay: new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        month: "numeric",
+        day: "numeric"
+      }).format(date),
+      shortDate: new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        month: "numeric",
+        day: "numeric",
+        year: "2-digit"
+      }).format(date)
+    });
+  }
+
+  return result;
+}

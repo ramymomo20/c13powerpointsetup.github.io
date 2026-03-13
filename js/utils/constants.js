@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   evening_switch_time: "17:00",
   display_refresh_seconds: 60,
   display_title: "Today's Events",
+  display_week_start_date: "",
   test_mode_enabled: false,
   test_effective_timestamp: "",
   test_override_day_of_week: "",

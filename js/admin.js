@@ -1,9 +1,16 @@
-import { getSession, isAllowedEditorEmail, onAuthStateChange, signIn, signOut } from "./auth.js";
-import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313c";
+import { getSession, isAllowedEditorEmail, onAuthStateChange, signIn, signOut } from "./auth.js?v=20260313d";
+import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313d";
 import { DAYS, DEFAULT_ROOM_NAMES, DEFAULT_SETTINGS, PERIODS } from "./utils/constants.js";
 import { clearChildren, setMessage, setVisible } from "./utils/dom.js";
 import { formatBlockLabel, settingsRowsToObject, sortScheduleItems, toAppSettingRows } from "./utils/schedule.js";
-import { fromDatetimeLocalToIso, getTimeZoneClockParts, resolveDisplayContext, toDatetimeLocalValue } from "./utils/time.js";
+import {
+  fromDatetimeLocalToIso,
+  getRepresentedWeekDates,
+  getRepresentedWeekStartYmd,
+  parseYmdToUtcDate,
+  resolveDisplayContext,
+  toDatetimeLocalValue
+} from "./utils/time.js";
 
 const refs = {
   globalMessage: document.getElementById("globalMessage"),
@@ -15,13 +22,16 @@ const refs = {
   loginForm: document.getElementById("loginForm"),
   emailInput: document.getElementById("emailInput"),
   passwordInput: document.getElementById("passwordInput"),
+  prevWeekBtn: document.getElementById("prevWeekBtn"),
+  currentWeekBtn: document.getElementById("currentWeekBtn"),
+  nextWeekBtn: document.getElementById("nextWeekBtn"),
+  weekRangeLabel: document.getElementById("weekRangeLabel"),
   daySelect: document.getElementById("daySelect"),
   periodSelect: document.getElementById("periodSelect"),
   blockTitleInput: document.getElementById("blockTitleInput"),
   itemsBody: document.getElementById("itemsBody"),
   saveBlockBtn: document.getElementById("saveBlockBtn"),
   clearBlockBtn: document.getElementById("clearBlockBtn"),
-  previewBtn: document.getElementById("previewBtn"),
   previewContainer: document.getElementById("previewContainer"),
   previewLabel: document.getElementById("previewLabel"),
   reloadBlockBtn: document.getElementById("reloadBlockBtn"),
@@ -56,40 +66,8 @@ function showMessage(text, kind = "info") {
   setMessage(refs.globalMessage, text, kind);
 }
 
-function getUpcomingDateLabelForDay(dayValue, timeZone = "America/New_York") {
-  const now = new Date();
-  const nowParts = getTimeZoneClockParts(now, timeZone);
-  const deltaDays = (dayValue - nowParts.dayOfWeek + 7) % 7;
-  const targetDate = new Date(now.getTime() + deltaDays * 24 * 60 * 60 * 1000);
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    month: "numeric",
-    day: "numeric",
-    year: "2-digit"
-  }).format(targetDate);
-}
-
-function populateSelects() {
-  refs.daySelect.innerHTML = DAYS
-    .map((day) => `<option value="${day.value}">${day.label} (${getUpcomingDateLabelForDay(day.value)})</option>`)
-    .join("");
-  refs.periodSelect.innerHTML = PERIODS.map((period) => `<option value="${period.value}">${period.label}</option>`).join("");
-
-  refs.testOverrideDaySelect.innerHTML = [
-    `<option value="">(Clock-driven)</option>`,
-    ...DAYS.map((day) => `<option value="${day.value}">${day.label} (${getUpcomingDateLabelForDay(day.value)})</option>`)
-  ].join("");
-
-  refs.testOverridePeriodSelect.innerHTML = [
-    `<option value="">(Clock-driven)</option>`,
-    ...PERIODS.map((period) => `<option value="${period.value}">${period.label}</option>`)
-  ].join("");
-}
-
-function setEditorVisible(visible) {
-  setVisible(refs.appShell, visible);
-  setVisible(refs.signOutBtn, visible);
-  setVisible(refs.signedInAs, visible);
+function normalizeRoomName(value) {
+  return String(value || "").trim().toUpperCase().replace(/^ROOM\s*/i, "");
 }
 
 function buildTextInput(value = "", placeholder = "") {
@@ -134,21 +112,57 @@ function normalizeTimeInput(value) {
 
   const outMeridiem = hour >= 12 ? "PM" : "AM";
   const hour12 = hour % 12 === 0 ? 12 : hour % 12;
-  const minuteText = String(minute).padStart(2, "0");
-  return `${hour12}:${minuteText} ${outMeridiem}`;
-}
-
-function normalizeRoomName(value) {
-  return String(value || "").trim().toUpperCase().replace(/^ROOM\s*/i, "");
+  return `${hour12}:${String(minute).padStart(2, "0")} ${outMeridiem}`;
 }
 
 const DEFAULT_ROOM_CODES = new Set(DEFAULT_ROOM_NAMES.map((name) => normalizeRoomName(name)));
 
-function addDefaultRoomRows() {
-  clearChildren(refs.itemsBody);
-  for (const roomName of DEFAULT_ROOM_NAMES) {
-    addItemRow({ room_name: roomName, is_visible: true });
-  }
+function getWeekDates() {
+  return getRepresentedWeekDates(state.settings, new Date());
+}
+
+function getDayLabel(dayValue) {
+  const entry = getWeekDates().find((day) => day.dayOfWeek === Number(dayValue));
+  return entry ? `${entry.weekdayLong} (${entry.shortDate})` : DAYS.find((day) => day.value === Number(dayValue))?.label || "Day";
+}
+
+function renderWeekRangeLabel() {
+  const weekDates = getWeekDates();
+  const start = weekDates[0];
+  const end = weekDates[6];
+  refs.weekRangeLabel.textContent = `${start.weekdayLong}, ${start.shortDate} - ${end.weekdayLong}, ${end.shortDate}`;
+}
+
+function populateSelects() {
+  const currentDayValue = refs.daySelect.value || String(DAYS[0].value);
+  const currentTestDayValue = refs.testOverrideDaySelect.value || "";
+  const weekDates = getWeekDates();
+
+  refs.daySelect.innerHTML = weekDates
+    .map((day) => `<option value="${day.dayOfWeek}">${day.weekdayLong} (${day.shortDate})</option>`)
+    .join("");
+
+  refs.periodSelect.innerHTML = PERIODS.map((period) => `<option value="${period.value}">${period.label}</option>`).join("");
+
+  refs.testOverrideDaySelect.innerHTML = [
+    `<option value="">(Clock-driven)</option>`,
+    ...weekDates.map((day) => `<option value="${day.dayOfWeek}">${day.weekdayLong} (${day.shortDate})</option>`)
+  ].join("");
+
+  refs.testOverridePeriodSelect.innerHTML = [
+    `<option value="">(Clock-driven)</option>`,
+    ...PERIODS.map((period) => `<option value="${period.value}">${period.label}</option>`)
+  ].join("");
+
+  refs.daySelect.value = DAYS.some((day) => String(day.value) === currentDayValue) ? currentDayValue : String(DAYS[0].value);
+  refs.testOverrideDaySelect.value = currentTestDayValue;
+  renderWeekRangeLabel();
+}
+
+function setEditorVisible(visible) {
+  setVisible(refs.appShell, visible);
+  setVisible(refs.signOutBtn, visible);
+  setVisible(refs.signedInAs, visible);
 }
 
 function addItemRow(item = {}) {
@@ -192,8 +206,7 @@ function collectItemRows() {
       const notes = row.querySelector('[data-field="notes"]')?.value.trim() || "";
       const isVisible = row.querySelector('[data-field="is_visible"]')?.checked ?? true;
       const hasContent = startText || eventTitle || notes;
-      const isDefaultTemplateRoom = DEFAULT_ROOM_CODES.has(normalizeRoomName(roomName));
-      const include = Boolean(hasContent || (roomName && !isDefaultTemplateRoom));
+      const include = Boolean(hasContent || (roomName && !DEFAULT_ROOM_CODES.has(normalizeRoomName(roomName))));
 
       return {
         include,
@@ -213,9 +226,11 @@ function collectItemRows() {
 
 function setLoadingButtons(disabled) {
   const buttons = [
+    refs.prevWeekBtn,
+    refs.currentWeekBtn,
+    refs.nextWeekBtn,
     refs.saveBlockBtn,
     refs.clearBlockBtn,
-    refs.previewBtn,
     refs.reloadBlockBtn,
     refs.saveSettingsBtn,
     refs.toggleTestToolsBtn,
@@ -223,10 +238,48 @@ function setLoadingButtons(disabled) {
     refs.refreshLogsBtn,
     refs.resetWeekBtn
   ];
+
   for (const button of buttons) {
     if (button) {
       button.disabled = disabled;
     }
+  }
+}
+
+function setButtonWorking(button, workingLabel) {
+  if (!button) {
+    return;
+  }
+  if (!button.dataset.originalLabel) {
+    button.dataset.originalLabel = button.textContent;
+  }
+  button.classList.remove("btn-confirmed");
+  button.classList.add("btn-working");
+  button.textContent = workingLabel;
+}
+
+function setButtonConfirmed(button, confirmedLabel) {
+  if (!button) {
+    return;
+  }
+  const originalLabel = button.dataset.originalLabel || button.textContent;
+  button.classList.remove("btn-working");
+  button.classList.add("btn-confirmed");
+  button.textContent = confirmedLabel;
+  window.setTimeout(() => {
+    button.classList.remove("btn-confirmed");
+    button.textContent = originalLabel;
+  }, 850);
+}
+
+function resetButtonState(button) {
+  if (!button) {
+    return;
+  }
+  button.classList.remove("btn-working");
+  button.classList.remove("btn-confirmed");
+  if (button.dataset.originalLabel) {
+    button.textContent = button.dataset.originalLabel;
   }
 }
 
@@ -236,6 +289,9 @@ async function fetchSettings() {
     throw error;
   }
   state.settings = settingsRowsToObject(data || []);
+  if (!state.settings.display_week_start_date) {
+    state.settings.display_week_start_date = getRepresentedWeekStartYmd(state.settings, new Date());
+  }
 }
 
 function renderSettingsForm() {
@@ -251,6 +307,7 @@ function renderSettingsForm() {
   refs.morningSwitchInput.value = state.settings.morning_switch_time || "05:00";
   refs.eveningSwitchInput.value = state.settings.evening_switch_time || "17:00";
   refs.displayTitleInput.value = state.settings.display_title || "Today's Events";
+  populateSelects();
 }
 
 function readSettingsForm() {
@@ -265,6 +322,7 @@ function readSettingsForm() {
     evening_switch_time: refs.eveningSwitchInput.value || "17:00",
     display_refresh_seconds: state.settings.display_refresh_seconds || 60,
     display_title: refs.displayTitleInput.value.trim() || "Today's Events",
+    display_week_start_date: state.settings.display_week_start_date || getRepresentedWeekStartYmd(state.settings, new Date()),
     test_mode_enabled: refs.testModeEnabled.checked,
     test_effective_timestamp: fromDatetimeLocalToIso(refs.testTimestampInput.value),
     test_override_day_of_week: Number.isInteger(testOverrideDay) ? testOverrideDay : "",
@@ -326,8 +384,7 @@ function renderEditorBlock(block) {
   }
 
   for (const roomName of DEFAULT_ROOM_NAMES) {
-    const roomCode = normalizeRoomName(roomName);
-    const roomItem = itemByRoomCode.get(roomCode);
+    const roomItem = itemByRoomCode.get(normalizeRoomName(roomName));
     addItemRow({
       room_name: roomName,
       start_time_text: roomItem?.start_time_text || "",
@@ -347,7 +404,7 @@ async function loadSelectedBlock() {
 
 function renderPreview(block, dayOfWeek, period) {
   clearChildren(refs.previewContainer);
-  refs.previewLabel.textContent = `Preview: ${formatBlockLabel(dayOfWeek, period)}`;
+  refs.previewLabel.textContent = `Preview: ${getDayLabel(dayOfWeek)} ${period === "morning" ? "Morning" : "Evening"}`;
   const items = sortScheduleItems(block?.schedule_items || []);
 
   if (!items.length) {
@@ -436,17 +493,22 @@ async function saveSelectedBlock() {
   await writeEventLog("schedule_updated", {
     day_of_week: dayOfWeek,
     period,
-    item_count: itemRows.length
+    item_count: itemRows.length,
+    display_week_start_date: state.settings.display_week_start_date
   }).catch(() => undefined);
 }
 
 async function clearSelectedBlock() {
-  if (!window.confirm("Clear all rows for this day/period block?")) {
+  if (!window.confirm(`Clear all room entries for ${getDayLabel(refs.daySelect.value)} ${refs.periodSelect.value}?`)) {
     return;
   }
 
   refs.blockTitleInput.value = state.settings.display_title || "Today's Events";
-  addDefaultRoomRows();
+  clearChildren(refs.itemsBody);
+  for (const roomName of DEFAULT_ROOM_NAMES) {
+    addItemRow({ room_name: roomName, is_visible: true });
+  }
+
   await saveSelectedBlock();
   await previewSelectedBlock();
   showMessage("Block cleared.", "info");
@@ -461,11 +523,48 @@ async function saveSettings() {
   }
 
   state.settings = nextSettings;
+  renderSettingsForm();
   renderModeSummary();
   await writeEventLog("schedule_updated", {
     settings_changed: true,
-    mode: nextSettings.test_mode_enabled ? "test" : "live"
+    mode: nextSettings.test_mode_enabled ? "test" : "live",
+    display_week_start_date: nextSettings.display_week_start_date
   }).catch(() => undefined);
+}
+
+async function persistWeekStartDate(nextWeekStartDate) {
+  state.settings.display_week_start_date = nextWeekStartDate;
+  const { error } = await supabase.from("app_settings").upsert(
+    {
+      key: "display_week_start_date",
+      value: nextWeekStartDate,
+      updated_by: state.user?.id ?? null,
+      updated_by_email: state.user?.email ?? null
+    },
+    { onConflict: "key" }
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  populateSelects();
+  await previewSelectedBlock();
+  await writeEventLog("schedule_updated", {
+    display_week_start_date: nextWeekStartDate,
+    week_navigation: true
+  }).catch(() => undefined);
+}
+
+async function shiftDisplayedWeek(offsetWeeks) {
+  const currentStart = parseYmdToUtcDate(state.settings.display_week_start_date || getRepresentedWeekStartYmd(state.settings, new Date()));
+  const nextStart = new Date(currentStart.getTime() + offsetWeeks * 7 * 24 * 60 * 60 * 1000);
+  const nextYmd = nextStart.toISOString().slice(0, 10);
+  await persistWeekStartDate(nextYmd);
+}
+
+async function jumpToCurrentWeek() {
+  await persistWeekStartDate(getRepresentedWeekStartYmd(state.settings, new Date()));
 }
 
 async function refreshLogs() {
@@ -640,10 +739,35 @@ function attachHandlers() {
     await signOut();
   });
 
+  refs.prevWeekBtn.addEventListener("click", () => {
+    setLoadingButtons(true);
+    shiftDisplayedWeek(-1)
+      .then(() => showMessage("Showing previous represented week.", "info"))
+      .catch((error) => showMessage(`Week change failed: ${error?.message || "unknown"}`, "error"))
+      .finally(() => setLoadingButtons(false));
+  });
+
+  refs.currentWeekBtn.addEventListener("click", () => {
+    setLoadingButtons(true);
+    jumpToCurrentWeek()
+      .then(() => showMessage("Returned to the current represented week.", "success"))
+      .catch((error) => showMessage(`Week change failed: ${error?.message || "unknown"}`, "error"))
+      .finally(() => setLoadingButtons(false));
+  });
+
+  refs.nextWeekBtn.addEventListener("click", () => {
+    setLoadingButtons(true);
+    shiftDisplayedWeek(1)
+      .then(() => showMessage("Showing next represented week.", "info"))
+      .catch((error) => showMessage(`Week change failed: ${error?.message || "unknown"}`, "error"))
+      .finally(() => setLoadingButtons(false));
+  });
+
   refs.reloadBlockBtn.addEventListener("click", () => {
     setLoadingButtons(true);
     loadSelectedBlock()
       .then(() => previewSelectedBlock())
+      .catch((error) => showMessage(`Reload failed: ${error?.message || "unknown"}`, "error"))
       .finally(() => setLoadingButtons(false));
   });
 
@@ -660,12 +784,19 @@ function attachHandlers() {
   });
 
   refs.saveBlockBtn.addEventListener("click", () => {
+    setButtonWorking(refs.saveBlockBtn, "Saving...");
     setLoadingButtons(true);
     saveSelectedBlock()
       .then(() => previewSelectedBlock())
       .then(() => refreshLogsIfVisible())
-      .then(() => showMessage("Block saved.", "success"))
-      .catch((error) => showMessage(`Save failed: ${error?.message || "unknown"}`, "error"))
+      .then(() => {
+        setButtonConfirmed(refs.saveBlockBtn, "Saved");
+        showMessage("Block saved.", "success");
+      })
+      .catch((error) => {
+        resetButtonState(refs.saveBlockBtn);
+        showMessage(`Save failed: ${error?.message || "unknown"}`, "error");
+      })
       .finally(() => setLoadingButtons(false));
   });
 
@@ -677,19 +808,19 @@ function attachHandlers() {
       .finally(() => setLoadingButtons(false));
   });
 
-  refs.previewBtn.addEventListener("click", () => {
-    setLoadingButtons(true);
-    previewSelectedBlock()
-      .catch((error) => showMessage(`Preview failed: ${error?.message || "unknown"}`, "error"))
-      .finally(() => setLoadingButtons(false));
-  });
-
   refs.saveSettingsBtn.addEventListener("click", () => {
+    setButtonWorking(refs.saveSettingsBtn, "Saving...");
     setLoadingButtons(true);
     saveSettings()
       .then(() => refreshLogsIfVisible())
-      .then(() => showMessage("Settings saved.", "success"))
-      .catch((error) => showMessage(`Settings save failed: ${error?.message || "unknown"}`, "error"))
+      .then(() => {
+        setButtonConfirmed(refs.saveSettingsBtn, "Saved");
+        showMessage("Settings saved.", "success");
+      })
+      .catch((error) => {
+        resetButtonState(refs.saveSettingsBtn);
+        showMessage(`Settings save failed: ${error?.message || "unknown"}`, "error"));
+      })
       .finally(() => setLoadingButtons(false));
   });
 

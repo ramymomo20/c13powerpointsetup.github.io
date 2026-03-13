@@ -7,15 +7,19 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Libre+Franklin:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./css/base.css?v=20260313c">
-  <link rel="stylesheet" href="./css/admin.css?v=20260313c">
+  <link rel="stylesheet" href="./css/base.css?v=20260313d">
+  <link rel="stylesheet" href="./css/admin.css?v=20260313d">
 </head>
 <body>
   <main class="admin-wrap">
     <header class="admin-top">
-      <div>
+      <div class="admin-brand-copy">
         <p class="eyebrow">AFSCME Council 13</p>
         <h1>Lobby Meeting Display Admin</h1>
+      </div>
+      <div class="header-logo-stack" aria-hidden="true">
+        <img src="./assets/OIP-2691290361.jpg" alt="">
+        <img src="./assets/OIP-2691290365.jpg" alt="">
       </div>
       <div class="top-actions">
         <a class="btn" href="./display.html" target="_blank" rel="noopener noreferrer">Open Display</a>
@@ -53,6 +57,12 @@
             <h2>Schedule Editor</h2>
             <button id="reloadBlockBtn" class="btn btn-small">Reload</button>
           </div>
+          <div class="week-nav">
+            <button id="prevWeekBtn" class="btn btn-small" type="button">Previous Week</button>
+            <div id="weekRangeLabel" class="week-range-label">Week of --</div>
+            <button id="currentWeekBtn" class="btn btn-small" type="button">Current Week</button>
+            <button id="nextWeekBtn" class="btn btn-small" type="button">Next Week</button>
+          </div>
           <div class="row controls-row">
             <label>Day
               <select id="daySelect"></select>
@@ -82,8 +92,8 @@
           <div class="row action-row">
             <button id="saveBlockBtn" class="btn btn-primary" type="button">Save Block</button>
             <button id="clearBlockBtn" class="btn btn-danger" type="button">Clear Block</button>
-            <button id="previewBtn" class="btn" type="button">Preview Block</button>
           </div>
+          <p class="danger-note">Clear Block removes all meeting details for the selected day and period after confirmation.</p>
         </section>
 
         <section class="panel">
@@ -158,6 +168,6 @@
     </section>
   </main>
 
-  <script type="module" src="./js/admin.js?v=20260313c"></script>
+  <script type="module" src="./js/admin.js?v=20260313d"></script>
 </body>
 </html>
