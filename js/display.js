@@ -1,20 +1,20 @@
-import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313a";
+import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313b";
 import { DEFAULT_ROOM_NAMES, DEFAULT_SETTINGS } from "./utils/constants.js";
 import { clearChildren, setVisible } from "./utils/dom.js";
 import { blockKey, formatBlockLabel, settingsRowsToObject, sortScheduleItems } from "./utils/schedule.js";
-import { resolveDisplayContext } from "./utils/time.js";
+import { getTimeZoneClockParts, resolveDisplayContext } from "./utils/time.js";
 
 const refs = {
   fullscreenBtn: document.getElementById("fullscreenBtn"),
+  viewToggleBtn: document.getElementById("viewToggleBtn"),
   title: document.getElementById("displayTitle"),
+  viewDescription: document.getElementById("viewDescription"),
   date: document.getElementById("displayDate"),
   time: document.getElementById("displayTime"),
   modeBadge: document.getElementById("modeBadge"),
   eventsContainer: document.getElementById("eventsContainer"),
   emptyState: document.getElementById("emptyState"),
-  statusText: document.getElementById("statusText"),
-  activeBlockText: document.getElementById("activeBlockText"),
-  lastRefreshText: document.getElementById("lastRefreshText")
+  statusText: document.getElementById("statusText")
 };
 
 const state = {
@@ -22,7 +22,8 @@ const state = {
   lastBlockKey: null,
   refreshTimer: null,
   refreshAlignmentTimer: null,
-  isLoading: false
+  isLoading: false,
+  viewMode: "daily"
 };
 
 function normalizeRoomName(value) {
@@ -44,8 +45,58 @@ function setModeBadge(mode) {
 
 function showConfigError() {
   setStatus("Supabase config missing or stale. Confirm js/config.js and hard refresh the page (Ctrl+F5).");
-  refs.activeBlockText.textContent = "Block: --";
-  refs.lastRefreshText.textContent = "Refresh: --";
+}
+
+function normalizeTimeLabel(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "";
+  }
+  const match = raw.match(/^(\d{1,2})(?::?(\d{2}))?\s*([AaPp][Mm])?$/);
+  if (!match) {
+    return raw;
+  }
+
+  let hour = Number(match[1]);
+  const minute = Number(match[2] || "0");
+  const meridiem = (match[3] || "").toUpperCase();
+  if (Number.isNaN(hour) || Number.isNaN(minute) || minute < 0 || minute > 59) {
+    return raw;
+  }
+
+  if (meridiem) {
+    if (hour < 1 || hour > 12) {
+      return raw;
+    }
+    if (hour === 12 && meridiem === "AM") {
+      hour = 0;
+    } else if (hour !== 12 && meridiem === "PM") {
+      hour += 12;
+    }
+  } else if (hour > 23) {
+    return raw;
+  }
+
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hour12}:${String(minute).padStart(2, "0")} ${ampm}`;
+}
+
+function toMinutesForSort(value) {
+  const normalized = normalizeTimeLabel(value);
+  const match = normalized.match(/^(\d{1,2}):(\d{2})\s([AP]M)$/);
+  if (!match) {
+    return null;
+  }
+  let hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const ampm = match[3];
+  if (hour === 12 && ampm === "AM") {
+    hour = 0;
+  } else if (hour !== 12 && ampm === "PM") {
+    hour += 12;
+  }
+  return hour * 60 + minute;
 }
 
 async function fetchSettings() {
@@ -56,8 +107,8 @@ async function fetchSettings() {
   return settingsRowsToObject(data);
 }
 
-async function fetchBlock(dayOfWeek) {
-  const query = supabase
+async function fetchWeekBlocks() {
+  const { data, error } = await supabase
     .from("schedule_blocks")
     .select(`
       id,
@@ -75,76 +126,104 @@ async function fetchBlock(dayOfWeek) {
         is_visible
       )
     `)
-    .eq("day_of_week", dayOfWeek)
     .eq("is_active", true)
+    .gte("day_of_week", 0)
+    .lte("day_of_week", 6)
     .in("period", ["morning", "evening"]);
 
-  const { data, error } = await query;
   if (error) {
     throw error;
   }
 
-  const blockMap = { morning: null, evening: null };
+  const weekMap = {};
+  for (let day = 0; day <= 6; day += 1) {
+    weekMap[day] = { morning: null, evening: null };
+  }
   for (const row of data || []) {
-    if (row.period === "morning" || row.period === "evening") {
-      blockMap[row.period] = row;
+    if ((row.period === "morning" || row.period === "evening") && weekMap[row.day_of_week]) {
+      weekMap[row.day_of_week][row.period] = row;
     }
   }
-  return blockMap;
-}
-
-function getItemTimeText(item) {
-  const start = String(item.start_time_text || "").trim();
-  return start || "";
-}
-
-function parseStartTimeToMinutes(timeText) {
-  const raw = String(timeText || "").trim();
-  if (!raw) {
-    return null;
-  }
-  const match = raw.match(/^(\d{1,2})(?::(\d{2}))?\s*([AaPp][Mm])?$/);
-  if (!match) {
-    return null;
-  }
-
-  let hour = Number(match[1]);
-  const minute = Number(match[2] || "0");
-  const ampm = (match[3] || "").toUpperCase();
-
-  if (ampm) {
-    if (hour === 12 && ampm === "AM") {
-      hour = 0;
-    } else if (hour !== 12 && ampm === "PM") {
-      hour += 12;
-    }
-  } else if (hour > 23) {
-    return null;
-  }
-
-  return hour * 60 + minute;
+  return weekMap;
 }
 
 function hasTimePassed(period, timeMinutes, context) {
   if (timeMinutes === null) {
     return false;
   }
-
   if (period === "morning") {
     if (context.period === "morning") {
       return context.currentMinutes >= timeMinutes;
     }
     return context.period === "evening";
   }
-
   if (context.period !== "evening") {
     return false;
   }
-
   if (context.currentMinutes < context.morningMinutes) {
     return true;
   }
   return context.currentMinutes >= timeMinutes;
+}
+
+function buildTimeRows(items) {
+  const byTime = new Map();
+  for (const item of items) {
+    const roomCode = normalizeRoomName(item.room_name);
+    if (!DEFAULT_ROOM_CODES.has(roomCode)) {
+      continue;
+    }
+    const label = normalizeTimeLabel(item.start_time_text) || "Time TBD";
+    const minutes = toMinutesForSort(label);
+    const key = minutes === null ? `tbd:${label}` : `m:${minutes}`;
+    if (!byTime.has(key)) {
+      byTime.set(key, { label, minutes, cellMap: new Map() });
+    }
+    const row = byTime.get(key);
+    const existing = row.cellMap.get(roomCode) || [];
+    existing.push(item);
+    row.cellMap.set(roomCode, existing);
+  }
+
+  return [...byTime.values()].sort((a, b) => {
+    if (a.minutes === null && b.minutes === null) {
+      return a.label.localeCompare(b.label);
+    }
+    if (a.minutes === null) {
+      return 1;
+    }
+    if (b.minutes === null) {
+      return -1;
+    }
+    return a.minutes - b.minutes;
+  });
+}
+
+function buildEventTile(eventItem, compact = false) {
+  const tile = document.createElement("div");
+  tile.className = compact ? "event-tile compact" : "event-tile";
+
+  const title = document.createElement("div");
+  title.className = "event-name";
+  title.textContent = eventItem.event_title || "No meeting scheduled";
+  tile.append(title);
+
+  const time = normalizeTimeLabel(eventItem.start_time_text);
+  if (time) {
+    const timeText = document.createElement("div");
+    timeText.className = "event-time";
+    timeText.textContent = time;
+    tile.append(timeText);
+  }
+
+  if (eventItem.notes) {
+    const notes = document.createElement("div");
+    notes.className = "event-note";
+    notes.textContent = eventItem.notes;
+    tile.append(notes);
+  }
+
+  return tile;
 }
 
 function renderPeriodGrid(period, items, context) {
@@ -171,39 +250,7 @@ function renderPeriodGrid(period, items, context) {
     grid.append(roomHead);
   }
 
-  const byTime = new Map();
-  for (const item of items) {
-    const roomCode = normalizeRoomName(item.room_name);
-    if (!DEFAULT_ROOM_CODES.has(roomCode)) {
-      continue;
-    }
-
-    const label = getItemTimeText(item) || "Time TBD";
-    const minutes = parseStartTimeToMinutes(label);
-    const key = minutes === null ? `tbd:${label}` : `m:${minutes}`;
-    if (!byTime.has(key)) {
-      byTime.set(key, { label, minutes, cellMap: new Map() });
-    }
-
-    const row = byTime.get(key);
-    const existing = row.cellMap.get(roomCode) || [];
-    existing.push(item);
-    row.cellMap.set(roomCode, existing);
-  }
-
-  const rows = [...byTime.values()].sort((a, b) => {
-    if (a.minutes === null && b.minutes === null) {
-      return a.label.localeCompare(b.label);
-    }
-    if (a.minutes === null) {
-      return 1;
-    }
-    if (b.minutes === null) {
-      return -1;
-    }
-    return a.minutes - b.minutes;
-  });
-
+  const rows = buildTimeRows(items);
   if (!rows.length) {
     const empty = document.createElement("div");
     empty.className = "period-empty";
@@ -217,32 +264,16 @@ function renderPeriodGrid(period, items, context) {
     const timeCell = document.createElement("div");
     timeCell.className = "time-cell";
     const passed = hasTimePassed(period, row.minutes, context);
-    timeCell.innerHTML = `<span class="time-text">${row.label}</span>${passed ? `<span class="time-check">✓</span>` : ""}`;
+    timeCell.innerHTML = `<span class="time-text">${row.label}</span>${passed ? '<span class="time-check">&#10003;</span>' : ""}`;
     grid.append(timeCell);
 
     for (const [roomCode] of ROOM_LABEL_BY_CODE) {
       const cell = document.createElement("div");
       cell.className = "event-cell";
       const events = row.cellMap.get(roomCode) || [];
-
       for (const eventItem of events) {
-        const entry = document.createElement("div");
-        entry.className = "event-entry";
-        const title = document.createElement("span");
-        title.className = "entry-title";
-        title.textContent = eventItem.event_title || "";
-        entry.append(title);
-
-        if (eventItem.notes) {
-          const notes = document.createElement("span");
-          notes.className = "entry-notes";
-          notes.textContent = ` - ${eventItem.notes}`;
-          entry.append(notes);
-        }
-
-        cell.append(entry);
+        cell.append(buildEventTile(eventItem, true));
       }
-
       grid.append(cell);
     }
   }
@@ -251,21 +282,131 @@ function renderPeriodGrid(period, items, context) {
   return section;
 }
 
-function renderSchedule(dayBlocks, context) {
-  const activeBlock = dayBlocks?.[context.period];
-  refs.title.textContent = activeBlock?.title || state.settings.display_title || "Today's Events";
-  refs.date.textContent = context.formattedDate;
-  refs.time.textContent = context.formattedTime;
-  setModeBadge(context.mode);
+function getCurrentWeekDates(context) {
+  const parts = getTimeZoneClockParts(context.effectiveDate, context.timezone);
+  const sundayTime = context.effectiveDate.getTime() - parts.dayOfWeek * 24 * 60 * 60 * 1000;
+  const result = [];
+  for (let i = 0; i < 7; i += 1) {
+    const date = new Date(sundayTime + i * 24 * 60 * 60 * 1000);
+    const label = new Intl.DateTimeFormat("en-US", {
+      timeZone: context.timezone,
+      weekday: "short",
+      month: "numeric",
+      day: "numeric"
+    }).format(date);
+    result.push({ dayOfWeek: i, label });
+  }
+  return result;
+}
 
-  const morningItems = sortScheduleItems(dayBlocks?.morning?.schedule_items || []);
-  const eveningItems = sortScheduleItems(dayBlocks?.evening?.schedule_items || []);
+function getDayRoomItems(weekBlocks, dayOfWeek, roomCode) {
+  const dayBlocks = weekBlocks?.[dayOfWeek] || { morning: null, evening: null };
+  const allItems = [
+    ...sortScheduleItems(dayBlocks.morning?.schedule_items || []),
+    ...sortScheduleItems(dayBlocks.evening?.schedule_items || [])
+  ].filter((item) => normalizeRoomName(item.room_name) === roomCode);
+
+  return allItems.sort((a, b) => {
+    const left = toMinutesForSort(a.start_time_text);
+    const right = toMinutesForSort(b.start_time_text);
+    if (left === null && right === null) {
+      return (a.event_title || "").localeCompare(b.event_title || "");
+    }
+    if (left === null) {
+      return 1;
+    }
+    if (right === null) {
+      return -1;
+    }
+    return left - right;
+  });
+}
+
+function renderWeeklyGrid(weekBlocks, context) {
+  const section = document.createElement("section");
+  section.className = "period-section weekly-section";
+
+  const heading = document.createElement("h2");
+  heading.className = "period-title";
+  heading.textContent = "Weekly Room Calendar";
+  section.append(heading);
+
+  const weekDays = getCurrentWeekDates(context);
+  const grid = document.createElement("div");
+  grid.className = "weekly-grid";
+
+  const topLeft = document.createElement("div");
+  topLeft.className = "grid-head room-col-head";
+  topLeft.textContent = "Room";
+  grid.append(topLeft);
+
+  for (const day of weekDays) {
+    const dayHead = document.createElement("div");
+    dayHead.className = "grid-head day-head";
+    dayHead.textContent = day.label;
+    grid.append(dayHead);
+  }
+
+  for (const roomName of DEFAULT_ROOM_NAMES) {
+    const roomCode = normalizeRoomName(roomName);
+    const roomCell = document.createElement("div");
+    roomCell.className = "room-label-cell";
+    roomCell.textContent = roomName;
+    grid.append(roomCell);
+
+    for (const day of weekDays) {
+      const cell = document.createElement("div");
+      cell.className = "weekly-cell";
+      const events = getDayRoomItems(weekBlocks, day.dayOfWeek, roomCode);
+      for (const eventItem of events) {
+        cell.append(buildEventTile(eventItem));
+      }
+      grid.append(cell);
+    }
+  }
+
+  section.append(grid);
+  return section;
+}
+
+function renderDaily(weekBlocks, context) {
+  const dayBlocks = weekBlocks?.[context.dayOfWeek] || { morning: null, evening: null };
+  const activeBlock = dayBlocks[context.period];
+  refs.title.textContent = activeBlock?.title || state.settings.display_title || "Today's Events";
+  refs.viewDescription.textContent = "Daily room schedule with morning and evening timeline.";
+
+  const morningItems = sortScheduleItems(dayBlocks.morning?.schedule_items || []);
+  const eveningItems = sortScheduleItems(dayBlocks.evening?.schedule_items || []);
   clearChildren(refs.eventsContainer);
-  setVisible(refs.emptyState, false);
   refs.eventsContainer.append(
     renderPeriodGrid("morning", morningItems, context),
     renderPeriodGrid("evening", eveningItems, context)
   );
+}
+
+function renderWeekly(weekBlocks, context) {
+  refs.title.textContent = "Weekly Events";
+  refs.viewDescription.textContent = "Room-by-day weekly schedule for the current week.";
+  clearChildren(refs.eventsContainer);
+  refs.eventsContainer.append(renderWeeklyGrid(weekBlocks, context));
+}
+
+function renderDisplay(weekBlocks, context) {
+  refs.date.textContent = context.formattedDate;
+  refs.time.textContent = context.formattedTime;
+  setModeBadge(context.mode);
+  setVisible(refs.emptyState, false);
+
+  if (state.viewMode === "weekly") {
+    renderWeekly(weekBlocks, context);
+  } else {
+    renderDaily(weekBlocks, context);
+  }
+}
+
+function updateViewToggleLabel() {
+  const isWeekly = state.viewMode === "weekly";
+  refs.viewToggleBtn.textContent = isWeekly ? "Switch To Daily View" : "Switch To Weekly View";
 }
 
 async function logBlockChange(previousKey, nextKey, context) {
@@ -316,7 +457,9 @@ function ensureRefreshTimer() {
 }
 
 function updateFullscreenButtonText() {
-  refs.fullscreenBtn.textContent = document.fullscreenElement ? "Exit Fullscreen" : "Enter Fullscreen";
+  const isFullscreen = Boolean(document.fullscreenElement);
+  refs.fullscreenBtn.textContent = isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen";
+  document.body.classList.toggle("fullscreen-active", isFullscreen);
 }
 
 async function toggleFullscreen() {
@@ -338,24 +481,16 @@ async function runRefreshCycle() {
     const settings = await fetchSettings();
     state.settings = settings;
     const context = resolveDisplayContext(settings, new Date());
-    const dayBlocks = await fetchBlock(context.dayOfWeek);
+    const weekBlocks = await fetchWeekBlocks();
     const currentKey = blockKey(context.dayOfWeek, context.period);
 
-    renderSchedule(dayBlocks, context);
-    refs.activeBlockText.textContent = `Block: ${formatBlockLabel(context.dayOfWeek, context.period)}`;
-    refs.lastRefreshText.textContent = `Refresh: ${new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit"
-    }).format(new Date())}`;
-    setStatus(`Source: ${context.source} (${context.timezone})`);
-
+    renderDisplay(weekBlocks, context);
+    setStatus(`Block: ${formatBlockLabel(context.dayOfWeek, context.period)} | ${context.source}`);
     await logBlockChange(state.lastBlockKey, currentKey, context).catch(() => undefined);
     state.lastBlockKey = currentKey;
-
     ensureRefreshTimer();
   } catch (error) {
-    const message = error?.message || "Unable to load schedule.";
-    setStatus(`Error: ${message}`);
+    setStatus(`Error: ${error?.message || "Unable to load schedule."}`);
   } finally {
     state.isLoading = false;
   }
@@ -367,12 +502,22 @@ async function init() {
       setStatus(`Fullscreen failed: ${error?.message || "unknown error"}`);
     });
   });
+
+  refs.viewToggleBtn.addEventListener("click", () => {
+    state.viewMode = state.viewMode === "weekly" ? "daily" : "weekly";
+    updateViewToggleLabel();
+    runRefreshCycle().catch(() => undefined);
+  });
+
   document.addEventListener("fullscreenchange", updateFullscreenButtonText);
   document.addEventListener("keydown", (event) => {
     if (event.key.toLowerCase() === "f") {
       toggleFullscreen().catch(() => undefined);
     }
   });
+
+  updateViewToggleLabel();
+  updateFullscreenButtonText();
 
   if (!isSupabaseConfigured()) {
     showConfigError();

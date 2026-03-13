@@ -1,5 +1,5 @@
 import { getSession, isAllowedEditorEmail, onAuthStateChange, signIn, signOut } from "./auth.js";
-import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313a";
+import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313b";
 import { DAYS, DEFAULT_ROOM_NAMES, DEFAULT_SETTINGS, PERIODS } from "./utils/constants.js";
 import { clearChildren, setMessage, setVisible } from "./utils/dom.js";
 import { formatBlockLabel, settingsRowsToObject, sortScheduleItems, toAppSettingRows } from "./utils/schedule.js";
@@ -34,9 +34,10 @@ const refs = {
   testEveningSwitchInput: document.getElementById("testEveningSwitchInput"),
   morningSwitchInput: document.getElementById("morningSwitchInput"),
   eveningSwitchInput: document.getElementById("eveningSwitchInput"),
-  refreshSecondsInput: document.getElementById("refreshSecondsInput"),
   displayTitleInput: document.getElementById("displayTitleInput"),
   saveSettingsBtn: document.getElementById("saveSettingsBtn"),
+  toggleTestToolsBtn: document.getElementById("toggleTestToolsBtn"),
+  testToolsPanel: document.getElementById("testToolsPanel"),
   toggleLogsBtn: document.getElementById("toggleLogsBtn"),
   logsPanel: document.getElementById("logsPanel"),
   refreshLogsBtn: document.getElementById("refreshLogsBtn"),
@@ -99,6 +100,44 @@ function buildTextInput(value = "", placeholder = "") {
   return input;
 }
 
+function normalizeTimeInput(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  const match = raw.match(/^(\d{1,2})(?::?(\d{2}))?\s*([AaPp][Mm])?$/);
+  if (!match) {
+    return raw;
+  }
+
+  let hour = Number(match[1]);
+  const minute = Number(match[2] || "0");
+  const meridiem = (match[3] || "").toUpperCase();
+
+  if (Number.isNaN(hour) || Number.isNaN(minute) || minute < 0 || minute > 59) {
+    return raw;
+  }
+
+  if (meridiem) {
+    if (hour < 1 || hour > 12) {
+      return raw;
+    }
+    if (hour === 12 && meridiem === "AM") {
+      hour = 0;
+    } else if (hour !== 12 && meridiem === "PM") {
+      hour += 12;
+    }
+  } else if (hour > 23) {
+    return raw;
+  }
+
+  const outMeridiem = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  const minuteText = String(minute).padStart(2, "0");
+  return `${hour12}:${minuteText} ${outMeridiem}`;
+}
+
 function normalizeRoomName(value) {
   return String(value || "").trim().toUpperCase().replace(/^ROOM\s*/i, "");
 }
@@ -147,7 +186,8 @@ function collectItemRows() {
   return rows
     .map((row, index) => {
       const roomName = row.dataset.roomName || "Room";
-      const startText = row.querySelector('[data-field="start_time_text"]')?.value.trim() || "";
+      const startTextRaw = row.querySelector('[data-field="start_time_text"]')?.value.trim() || "";
+      const startText = normalizeTimeInput(startTextRaw);
       const eventTitle = row.querySelector('[data-field="event_title"]')?.value.trim() || "";
       const notes = row.querySelector('[data-field="notes"]')?.value.trim() || "";
       const isVisible = row.querySelector('[data-field="is_visible"]')?.checked ?? true;
@@ -178,6 +218,7 @@ function setLoadingButtons(disabled) {
     refs.previewBtn,
     refs.reloadBlockBtn,
     refs.saveSettingsBtn,
+    refs.toggleTestToolsBtn,
     refs.toggleLogsBtn,
     refs.refreshLogsBtn,
     refs.resetWeekBtn
@@ -209,13 +250,10 @@ function renderSettingsForm() {
   refs.testEveningSwitchInput.value = state.settings.test_evening_switch_time || "";
   refs.morningSwitchInput.value = state.settings.morning_switch_time || "05:00";
   refs.eveningSwitchInput.value = state.settings.evening_switch_time || "17:00";
-  refs.refreshSecondsInput.value = String(state.settings.display_refresh_seconds || 60);
   refs.displayTitleInput.value = state.settings.display_title || "Today's Events";
 }
 
 function readSettingsForm() {
-  const parsedRefresh = Number(refs.refreshSecondsInput.value || "60");
-  const refreshSeconds = Number.isFinite(parsedRefresh) ? Math.min(Math.max(parsedRefresh, 15), 3600) : 60;
   const testOverrideDayRaw = refs.testOverrideDaySelect.value;
   const testOverrideDay = testOverrideDayRaw === "" ? "" : Number(testOverrideDayRaw);
   const testOverridePeriod = refs.testOverridePeriodSelect.value || "";
@@ -225,7 +263,7 @@ function readSettingsForm() {
     display_timezone: "America/New_York",
     morning_switch_time: refs.morningSwitchInput.value || "05:00",
     evening_switch_time: refs.eveningSwitchInput.value || "17:00",
-    display_refresh_seconds: refreshSeconds,
+    display_refresh_seconds: state.settings.display_refresh_seconds || 60,
     display_title: refs.displayTitleInput.value.trim() || "Today's Events",
     test_mode_enabled: refs.testModeEnabled.checked,
     test_effective_timestamp: fromDatetimeLocalToIso(refs.testTimestampInput.value),
@@ -474,6 +512,12 @@ async function toggleLogsPanel() {
   }
 }
 
+function toggleTestToolsPanel() {
+  const shouldShow = refs.testToolsPanel.classList.contains("hidden");
+  setVisible(refs.testToolsPanel, shouldShow);
+  refs.toggleTestToolsBtn.textContent = shouldShow ? "Hide Test Tools" : "Show Test Tools";
+}
+
 async function resetWeek() {
   const confirmed = window.confirm("Reset all 14 blocks and remove all schedule rows?");
   if (!confirmed) {
@@ -523,6 +567,8 @@ async function bootstrapEditor() {
 
   await loadSelectedBlock();
   await previewSelectedBlock();
+  setVisible(refs.testToolsPanel, false);
+  refs.toggleTestToolsBtn.textContent = "Show Test Tools";
   setVisible(refs.logsPanel, false);
   refs.toggleLogsBtn.textContent = "Show Events";
   renderModeSummary();
@@ -645,6 +691,10 @@ function attachHandlers() {
       .then(() => showMessage("Settings saved.", "success"))
       .catch((error) => showMessage(`Settings save failed: ${error?.message || "unknown"}`, "error"))
       .finally(() => setLoadingButtons(false));
+  });
+
+  refs.toggleTestToolsBtn.addEventListener("click", () => {
+    toggleTestToolsPanel();
   });
 
   refs.toggleLogsBtn.addEventListener("click", () => {

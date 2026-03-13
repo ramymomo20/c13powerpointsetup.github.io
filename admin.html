@@ -94,40 +94,45 @@
         </section>
 
         <section class="panel">
-          <h2>Live/Test Settings</h2>
+          <h2>Display Settings</h2>
           <p id="modeSummary" class="notice-inline">Mode: --</p>
-          <div class="settings-grid">
-            <label class="checkline">
-              <input id="testModeEnabled" type="checkbox">
-              Enable Test Mode
-            </label>
-            <label>Test Timestamp
-              <input id="testTimestampInput" type="datetime-local">
-            </label>
-            <label>Test Override Day
-              <select id="testOverrideDaySelect"></select>
-            </label>
-            <label>Test Override Period
-              <select id="testOverridePeriodSelect"></select>
-            </label>
-            <label>Morning Switch Time (test)
-              <input id="testMorningSwitchInput" type="time">
-            </label>
-            <label>Evening Switch Time (test)
-              <input id="testEveningSwitchInput" type="time">
-            </label>
+          <div class="settings-grid live-settings">
             <label>Official Morning Switch
               <input id="morningSwitchInput" type="time">
             </label>
             <label>Official Evening Switch
               <input id="eveningSwitchInput" type="time">
             </label>
-            <label>Display Refresh (seconds)
-              <input id="refreshSecondsInput" type="number" min="15" max="3600" step="1">
-            </label>
             <label>Display Title
               <input id="displayTitleInput" type="text" maxlength="120">
             </label>
+          </div>
+          <div class="row">
+            <button id="toggleTestToolsBtn" class="btn btn-small" type="button">Show Test Tools</button>
+          </div>
+          <div id="testToolsPanel" class="test-tools hidden">
+            <p class="muted test-help">Use these only to simulate clock behavior. Live mode remains unaffected when disabled.</p>
+            <div class="settings-grid">
+              <label class="checkline">
+                <input id="testModeEnabled" type="checkbox">
+                Enable Test Mode
+              </label>
+              <label>Test Timestamp
+                <input id="testTimestampInput" type="datetime-local">
+              </label>
+              <label>Test Override Day
+                <select id="testOverrideDaySelect"></select>
+              </label>
+              <label>Test Override Period
+                <select id="testOverridePeriodSelect"></select>
+              </label>
+              <label>Morning Switch Time (test)
+                <input id="testMorningSwitchInput" type="time">
+              </label>
+              <label>Evening Switch Time (test)
+                <input id="testEveningSwitchInput" type="time">
+              </label>
+            </div>
           </div>
           <div class="row action-row">
             <button id="saveSettingsBtn" class="btn btn-primary" type="button">Save Settings</button>
@@ -154,6 +159,6 @@
     </section>
   </main>
 
-  <script type="module" src="./js/admin.js?v=20260313a"></script>
+  <script type="module" src="./js/admin.js?v=20260313b"></script>
 </body>
 </html>

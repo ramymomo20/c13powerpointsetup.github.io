@@ -12,6 +12,7 @@
 </head>
 <body class="display-body">
   <div class="display-actions">
+    <button id="viewToggleBtn" class="btn btn-small view-toggle-btn" type="button">Switch To Weekly View</button>
     <button id="fullscreenBtn" class="btn btn-small" type="button">Enter Fullscreen</button>
   </div>
   <main class="display-shell">
@@ -20,6 +21,7 @@
         <div>
         <p class="eyebrow">AFSCME Council 13</p>
         <h1 id="displayTitle">Today's Events</h1>
+        <p id="viewDescription" class="view-description">Daily room schedule with morning and evening timeline.</p>
         </div>
       </div>
       <div class="header-meta">
@@ -37,12 +39,11 @@
     </section>
 
     <footer class="display-footer">
-      <p id="statusText">Loading schedule...</p>
-      <p id="activeBlockText">Block: --</p>
-      <p id="lastRefreshText">Refresh: --</p>
+      <img class="footer-logo" src="./assets/afscme-gradient-og-348001557.jpg" alt="AFSCME">
+      <p id="statusText" class="status-hidden">Loading schedule...</p>
     </footer>
   </main>
 
-  <script type="module" src="./js/display.js?v=20260313a"></script>
+  <script type="module" src="./js/display.js?v=20260313b"></script>
 </body>
 </html>
