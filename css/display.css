@@ -61,7 +61,7 @@
   border: 1px solid #c4ddd4;
   box-shadow: 0 12px 24px rgba(7, 45, 28, 0.22);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 0.9rem;
 }
@@ -75,6 +75,20 @@
 
 .header-main {
   min-width: 0;
+}
+
+.header-logo-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-logo-mark img {
+  display: block;
+  width: min(240px, 21vw);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 14px rgba(17, 37, 52, 0.12));
 }
 
 .view-description {
@@ -456,5 +470,9 @@
 
   .weekly-board {
     min-width: 1240px;
+  }
+
+  .header-logo-mark img {
+    width: min(200px, 52vw);
   }
 }
