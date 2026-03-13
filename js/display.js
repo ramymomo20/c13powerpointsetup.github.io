@@ -1,4 +1,4 @@
-import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313b";
+import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313c";
 import { DEFAULT_ROOM_NAMES, DEFAULT_SETTINGS } from "./utils/constants.js";
 import { clearChildren, setVisible } from "./utils/dom.js";
 import { blockKey, formatBlockLabel, settingsRowsToObject, sortScheduleItems } from "./utils/schedule.js";
@@ -202,6 +202,13 @@ function buildTimeRows(items) {
 function buildEventTile(eventItem, compact = false) {
   const tile = document.createElement("div");
   tile.className = compact ? "event-tile compact" : "event-tile";
+  const colorClasses = ["chip-blue", "chip-green", "chip-gold", "chip-orange"];
+  const hashSource = `${eventItem.event_title || ""}|${eventItem.start_time_text || ""}|${eventItem.room_name || ""}`;
+  let hash = 0;
+  for (let i = 0; i < hashSource.length; i += 1) {
+    hash = (hash * 31 + hashSource.charCodeAt(i)) >>> 0;
+  }
+  tile.classList.add(colorClasses[hash % colorClasses.length]);
 
   const title = document.createElement("div");
   title.className = "event-name";
@@ -288,25 +295,38 @@ function getCurrentWeekDates(context) {
   const result = [];
   for (let i = 0; i < 7; i += 1) {
     const date = new Date(sundayTime + i * 24 * 60 * 60 * 1000);
-    const label = new Intl.DateTimeFormat("en-US", {
+    const weekdayShort = new Intl.DateTimeFormat("en-US", {
       timeZone: context.timezone,
-      weekday: "short",
+      weekday: "short"
+    }).format(date);
+    const dateLabel = new Intl.DateTimeFormat("en-US", {
+      timeZone: context.timezone,
       month: "numeric",
       day: "numeric"
     }).format(date);
-    result.push({ dayOfWeek: i, label });
+    result.push({ dayOfWeek: i, weekdayShort, dateLabel, label: `${weekdayShort} ${dateLabel}` });
   }
   return result;
 }
 
 function getDayRoomItems(weekBlocks, dayOfWeek, roomCode) {
   const dayBlocks = weekBlocks?.[dayOfWeek] || { morning: null, evening: null };
-  const allItems = [
-    ...sortScheduleItems(dayBlocks.morning?.schedule_items || []),
-    ...sortScheduleItems(dayBlocks.evening?.schedule_items || [])
-  ].filter((item) => normalizeRoomName(item.room_name) === roomCode);
+  const morningItems = sortScheduleItems(dayBlocks.morning?.schedule_items || []).map((item) => ({
+    ...item,
+    period: "morning"
+  }));
+  const eveningItems = sortScheduleItems(dayBlocks.evening?.schedule_items || []).map((item) => ({
+    ...item,
+    period: "evening"
+  }));
+  const allItems = [...morningItems, ...eveningItems].filter((item) => normalizeRoomName(item.room_name) === roomCode);
 
   return allItems.sort((a, b) => {
+    const periodOrder = { morning: 0, evening: 1 };
+    const periodDelta = (periodOrder[a.period] ?? 99) - (periodOrder[b.period] ?? 99);
+    if (periodDelta !== 0) {
+      return periodDelta;
+    }
     const left = toMinutesForSort(a.start_time_text);
     const right = toMinutesForSort(b.start_time_text);
     if (left === null && right === null) {
@@ -332,40 +352,60 @@ function renderWeeklyGrid(weekBlocks, context) {
   section.append(heading);
 
   const weekDays = getCurrentWeekDates(context);
-  const grid = document.createElement("div");
-  grid.className = "weekly-grid";
+  const boardWrap = document.createElement("div");
+  boardWrap.className = "weekly-board-wrap";
 
-  const topLeft = document.createElement("div");
-  topLeft.className = "grid-head room-col-head";
-  topLeft.textContent = "Room";
-  grid.append(topLeft);
+  const board = document.createElement("div");
+  board.className = "weekly-board";
+
+  const corner = document.createElement("div");
+  corner.className = "weekly-corner";
+  corner.textContent = "Room";
+  board.append(corner);
 
   for (const day of weekDays) {
     const dayHead = document.createElement("div");
-    dayHead.className = "grid-head day-head";
-    dayHead.textContent = day.label;
-    grid.append(dayHead);
+    dayHead.className = "weekly-day-head";
+    dayHead.innerHTML = `<span class="day-name">${day.weekdayShort}</span><span class="day-date">${day.dateLabel}</span>`;
+    board.append(dayHead);
   }
 
   for (const roomName of DEFAULT_ROOM_NAMES) {
     const roomCode = normalizeRoomName(roomName);
     const roomCell = document.createElement("div");
-    roomCell.className = "room-label-cell";
+    roomCell.className = "weekly-room-label";
     roomCell.textContent = roomName;
-    grid.append(roomCell);
+    board.append(roomCell);
 
     for (const day of weekDays) {
       const cell = document.createElement("div");
-      cell.className = "weekly-cell";
+      cell.className = "weekly-day-cell";
       const events = getDayRoomItems(weekBlocks, day.dayOfWeek, roomCode);
+
       for (const eventItem of events) {
-        cell.append(buildEventTile(eventItem));
+        const card = buildEventTile(eventItem);
+        card.classList.add("weekly-event-tile");
+
+        const periodTag = document.createElement("div");
+        periodTag.className = "weekly-period-tag";
+        periodTag.textContent = eventItem.period === "evening" ? "Evening" : "Morning";
+        card.append(periodTag);
+        cell.append(card);
       }
-      grid.append(cell);
+
+      if (!events.length) {
+        const empty = document.createElement("div");
+        empty.className = "weekly-empty-cell";
+        empty.setAttribute("aria-hidden", "true");
+        cell.append(empty);
+      }
+
+      board.append(cell);
     }
   }
 
-  section.append(grid);
+  boardWrap.append(board);
+  section.append(boardWrap);
   return section;
 }
 
@@ -386,7 +426,7 @@ function renderDaily(weekBlocks, context) {
 
 function renderWeekly(weekBlocks, context) {
   refs.title.textContent = "Weekly Events";
-  refs.viewDescription.textContent = "Room-by-day weekly schedule for the current week.";
+  refs.viewDescription.textContent = "Outlook-style room calendar for the current week.";
   clearChildren(refs.eventsContainer);
   refs.eventsContainer.append(renderWeeklyGrid(weekBlocks, context));
 }

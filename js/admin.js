@@ -1,5 +1,5 @@
 import { getSession, isAllowedEditorEmail, onAuthStateChange, signIn, signOut } from "./auth.js";
-import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313b";
+import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313c";
 import { DAYS, DEFAULT_ROOM_NAMES, DEFAULT_SETTINGS, PERIODS } from "./utils/constants.js";
 import { clearChildren, setMessage, setVisible } from "./utils/dom.js";
 import { formatBlockLabel, settingsRowsToObject, sortScheduleItems, toAppSettingRows } from "./utils/schedule.js";

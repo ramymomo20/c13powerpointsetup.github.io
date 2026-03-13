@@ -1,13 +1,18 @@
+body {
+  background:
+    radial-gradient(circle at 8% 10%, rgba(167, 232, 190, 0.24), transparent 33%),
+    radial-gradient(circle at 92% 90%, rgba(126, 210, 156, 0.22), transparent 30%),
+    linear-gradient(145deg, #0f6f47, #138a53 50%, #0f7e56);
+}
+
 .admin-wrap {
-  max-width: 1520px;
+  max-width: 1540px;
   margin: 0 auto;
   padding: 1.2rem;
-  background:
-    linear-gradient(145deg, rgba(43, 120, 192, 0.12), rgba(17, 158, 90, 0.12)),
-    rgba(255, 255, 255, 0.68);
-  border: 1px solid #c7d9e8;
-  border-radius: 1.2rem;
-  backdrop-filter: blur(1px);
+  border: 1px solid #a9d1b8;
+  border-radius: 1.1rem;
+  background: linear-gradient(170deg, rgba(244, 252, 247, 0.97), rgba(236, 249, 241, 0.97));
+  box-shadow: 0 14px 30px rgba(7, 43, 23, 0.24);
 }
 
 .admin-top {
@@ -16,11 +21,9 @@
   gap: 1rem;
   align-items: end;
   margin-bottom: 1rem;
-  border-radius: 1rem;
-  border: 1px solid #c8daea;
-  background:
-    linear-gradient(120deg, rgba(43, 120, 192, 0.1), rgba(17, 158, 90, 0.12)),
-    #ffffff;
+  border-radius: 0.95rem;
+  border: 1px solid #b5d6c2;
+  background: linear-gradient(125deg, #e2f4e8, #eef9f2);
   padding: 0.85rem 1rem;
 }
 
@@ -31,19 +34,11 @@
   flex-wrap: wrap;
 }
 
-.admin-logo {
-  height: 44px;
-  width: auto;
-  border-radius: 0.5rem;
-  border: 1px solid #c8d7e5;
-  background: #fff;
-}
-
 .notice {
-  border: 1px solid #b9d5e9;
+  border: 1px solid #b7dcc3;
   border-radius: 0.75rem;
-  background: #ecf5ff;
-  color: #1f4967;
+  background: #eef9f1;
+  color: #1b5a31;
   padding: 0.65rem 0.8rem;
   margin-bottom: 1rem;
 }
@@ -62,9 +57,9 @@
 
 .panel {
   border-radius: 1rem;
-  border: 1px solid var(--border);
-  background: linear-gradient(170deg, #ffffff, #f4fafc);
-  box-shadow: var(--shadow-soft);
+  border: 1px solid #bed9c8;
+  background: linear-gradient(170deg, #ffffff, #f3fbf6);
+  box-shadow: 0 10px 22px rgba(7, 43, 23, 0.11);
   padding: 1rem;
 }
 
@@ -119,13 +114,13 @@
 
 .items-table th,
 .items-table td {
-  border: 1px solid #e0e6f0;
+  border: 1px solid #d6e5dc;
   padding: 0.4rem;
   vertical-align: top;
 }
 
 .items-table th {
-  background: var(--surface-soft);
+  background: #eaf6ee;
   text-align: left;
 }
 
@@ -135,8 +130,8 @@
 }
 
 .room-fixed {
-  font-weight: 700;
-  color: #14354f;
+  font-weight: 800;
+  color: #13482e;
   white-space: nowrap;
 }
 
@@ -146,25 +141,25 @@
 }
 
 .preview-item {
-  border: 1px solid #c9dceb;
+  border: 1px solid #cde2d3;
   border-radius: 0.7rem;
   padding: 0.6rem;
-  background: #f8fcff;
+  background: #f8fdf9;
 }
 
 .preview-room {
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .preview-title {
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .notice-inline {
-  border: 1px solid #c6d9e9;
+  border: 1px solid #c8dfcf;
   border-radius: 0.7rem;
-  background: linear-gradient(130deg, #eef6ff, #eefaf3);
+  background: linear-gradient(130deg, #edf8f0, #ecf8ef);
   padding: 0.55rem 0.65rem;
 }
 
@@ -180,9 +175,9 @@
 
 .test-tools {
   margin-top: 0.5rem;
-  border: 1px solid #cde0ec;
+  border: 1px solid #cde2d3;
   border-radius: 0.75rem;
-  background: #f7fbff;
+  background: #f6fcf8;
   padding: 0.7rem;
 }
 
@@ -193,9 +188,15 @@
 .checkline {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.5rem;
   font-weight: 700;
-  margin-top: 1.55rem;
+  margin-top: 0.35rem;
+  min-height: 2.35rem;
+  border: 1px solid #cce2d4;
+  border-radius: 0.6rem;
+  background: #f7fcf9;
+  padding: 0.45rem 0.55rem;
+  white-space: nowrap;
 }
 
 .checkline input[type="checkbox"] {
@@ -214,9 +215,9 @@
 }
 
 .event-list li {
-  border: 1px solid #cadbea;
+  border: 1px solid #cde2d3;
   border-radius: 0.6rem;
-  background: #f7fcff;
+  background: #f8fdf9;
   padding: 0.45rem 0.55rem;
   font-size: 0.92rem;
 }
