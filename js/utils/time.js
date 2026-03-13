@@ -149,6 +149,9 @@ export function resolveDisplayContext(settings, nowDate = new Date()) {
     effectiveDate,
     dayOfWeek,
     period,
+    currentMinutes: resolved.currentMinutes,
+    morningMinutes: resolved.morningMinutes,
+    eveningMinutes: resolved.eveningMinutes,
     formattedDate: formatDateInTimeZone(effectiveDate, timezone),
     formattedTime: formatTimeInTimeZone(effectiveDate, timezone),
     switchTimes: {

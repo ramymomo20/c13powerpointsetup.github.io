@@ -1,4 +1,4 @@
-import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260312d";
+import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313a";
 import { DEFAULT_ROOM_NAMES, DEFAULT_SETTINGS } from "./utils/constants.js";
 import { clearChildren, setVisible } from "./utils/dom.js";
 import { blockKey, formatBlockLabel, settingsRowsToObject, sortScheduleItems } from "./utils/schedule.js";
@@ -21,7 +21,7 @@ const state = {
   settings: { ...DEFAULT_SETTINGS },
   lastBlockKey: null,
   refreshTimer: null,
-  refreshSeconds: null,
+  refreshAlignmentTimer: null,
   isLoading: false
 };
 
@@ -30,6 +30,7 @@ function normalizeRoomName(value) {
 }
 
 const DEFAULT_ROOM_CODES = new Set(DEFAULT_ROOM_NAMES.map((name) => normalizeRoomName(name)));
+const ROOM_LABEL_BY_CODE = new Map(DEFAULT_ROOM_NAMES.map((label) => [normalizeRoomName(label), label]));
 
 function setStatus(text) {
   refs.statusText.textContent = text;
@@ -55,7 +56,7 @@ async function fetchSettings() {
   return settingsRowsToObject(data);
 }
 
-async function fetchBlock(dayOfWeek, period) {
+async function fetchBlock(dayOfWeek) {
   const query = supabase
     .from("schedule_blocks")
     .select(`
@@ -68,7 +69,6 @@ async function fetchBlock(dayOfWeek, period) {
         id,
         room_name,
         start_time_text,
-        end_time_text,
         event_title,
         notes,
         sort_order,
@@ -76,113 +76,196 @@ async function fetchBlock(dayOfWeek, period) {
       )
     `)
     .eq("day_of_week", dayOfWeek)
-    .eq("period", period)
     .eq("is_active", true)
-    .maybeSingle();
+    .in("period", ["morning", "evening"]);
 
   const { data, error } = await query;
   if (error) {
     throw error;
   }
 
-  return data;
+  const blockMap = { morning: null, evening: null };
+  for (const row of data || []) {
+    if (row.period === "morning" || row.period === "evening") {
+      blockMap[row.period] = row;
+    }
+  }
+  return blockMap;
 }
 
 function getItemTimeText(item) {
   const start = String(item.start_time_text || "").trim();
-  const end = String(item.end_time_text || "").trim();
-  return start && end ? `${start} - ${end}` : start || end || "";
+  return start || "";
 }
 
-function renderRoomCard(roomName, item) {
-  const article = document.createElement("article");
-  article.className = "room-card";
-
-  const roomLabel = document.createElement("div");
-  roomLabel.className = "room-label";
-  roomLabel.textContent = roomName;
-  const roomTime = document.createElement("div");
-  roomTime.className = "room-time";
-  roomTime.textContent = item ? getItemTimeText(item) || "Time TBD" : "No Time";
-  const title = document.createElement("div");
-  title.className = "room-title";
-  title.textContent = item?.event_title || "No meeting scheduled";
-  const notes = document.createElement("div");
-  notes.className = "room-notes";
-  notes.textContent = item?.notes || "";
-
-  article.append(roomLabel, roomTime, title, notes);
-
-  if (item?.notes) {
-    return article;
-  }
-
-  if (!item) {
-    const empty = document.createElement("div");
-    empty.className = "room-empty";
-    empty.textContent = "Add a title and optional time in Admin.";
-    article.append(empty);
-  }
-
-  return article;
-}
-
-function renderExtraRooms(items) {
-  if (!items.length) {
+function parseStartTimeToMinutes(timeText) {
+  const raw = String(timeText || "").trim();
+  if (!raw) {
     return null;
   }
-  const section = document.createElement("section");
-  section.className = "extra-rooms";
-  const heading = document.createElement("h3");
-  heading.textContent = "Additional Rooms";
-  const list = document.createElement("div");
-  list.className = "extra-rooms-list";
-
-  for (const item of items) {
-    const row = document.createElement("article");
-    row.className = "extra-room-item";
-    row.innerHTML = `
-      <strong>${item.room_name || "Room"}</strong>
-      <div>${item.event_title || "Meeting"}</div>
-      <div>${getItemTimeText(item) || "Time TBD"}</div>
-      <div>${item.notes || ""}</div>
-    `;
-    list.append(row);
+  const match = raw.match(/^(\d{1,2})(?::(\d{2}))?\s*([AaPp][Mm])?$/);
+  if (!match) {
+    return null;
   }
 
-  section.append(heading, list);
+  let hour = Number(match[1]);
+  const minute = Number(match[2] || "0");
+  const ampm = (match[3] || "").toUpperCase();
+
+  if (ampm) {
+    if (hour === 12 && ampm === "AM") {
+      hour = 0;
+    } else if (hour !== 12 && ampm === "PM") {
+      hour += 12;
+    }
+  } else if (hour > 23) {
+    return null;
+  }
+
+  return hour * 60 + minute;
+}
+
+function hasTimePassed(period, timeMinutes, context) {
+  if (timeMinutes === null) {
+    return false;
+  }
+
+  if (period === "morning") {
+    if (context.period === "morning") {
+      return context.currentMinutes >= timeMinutes;
+    }
+    return context.period === "evening";
+  }
+
+  if (context.period !== "evening") {
+    return false;
+  }
+
+  if (context.currentMinutes < context.morningMinutes) {
+    return true;
+  }
+  return context.currentMinutes >= timeMinutes;
+}
+
+function renderPeriodGrid(period, items, context) {
+  const section = document.createElement("section");
+  section.className = "period-section";
+
+  const heading = document.createElement("h2");
+  heading.className = "period-title";
+  heading.textContent = period === "morning" ? "Morning Schedule" : "Evening Schedule";
+  section.append(heading);
+
+  const grid = document.createElement("div");
+  grid.className = "period-grid";
+
+  const timeHead = document.createElement("div");
+  timeHead.className = "grid-head time-head";
+  timeHead.textContent = "Time";
+  grid.append(timeHead);
+
+  for (const roomName of DEFAULT_ROOM_NAMES) {
+    const roomHead = document.createElement("div");
+    roomHead.className = "grid-head room-head";
+    roomHead.textContent = roomName;
+    grid.append(roomHead);
+  }
+
+  const byTime = new Map();
+  for (const item of items) {
+    const roomCode = normalizeRoomName(item.room_name);
+    if (!DEFAULT_ROOM_CODES.has(roomCode)) {
+      continue;
+    }
+
+    const label = getItemTimeText(item) || "Time TBD";
+    const minutes = parseStartTimeToMinutes(label);
+    const key = minutes === null ? `tbd:${label}` : `m:${minutes}`;
+    if (!byTime.has(key)) {
+      byTime.set(key, { label, minutes, cellMap: new Map() });
+    }
+
+    const row = byTime.get(key);
+    const existing = row.cellMap.get(roomCode) || [];
+    existing.push(item);
+    row.cellMap.set(roomCode, existing);
+  }
+
+  const rows = [...byTime.values()].sort((a, b) => {
+    if (a.minutes === null && b.minutes === null) {
+      return a.label.localeCompare(b.label);
+    }
+    if (a.minutes === null) {
+      return 1;
+    }
+    if (b.minutes === null) {
+      return -1;
+    }
+    return a.minutes - b.minutes;
+  });
+
+  if (!rows.length) {
+    const empty = document.createElement("div");
+    empty.className = "period-empty";
+    empty.textContent = "No meetings scheduled.";
+    grid.append(empty);
+    section.append(grid);
+    return section;
+  }
+
+  for (const row of rows) {
+    const timeCell = document.createElement("div");
+    timeCell.className = "time-cell";
+    const passed = hasTimePassed(period, row.minutes, context);
+    timeCell.innerHTML = `<span class="time-text">${row.label}</span>${passed ? `<span class="time-check">✓</span>` : ""}`;
+    grid.append(timeCell);
+
+    for (const [roomCode] of ROOM_LABEL_BY_CODE) {
+      const cell = document.createElement("div");
+      cell.className = "event-cell";
+      const events = row.cellMap.get(roomCode) || [];
+
+      for (const eventItem of events) {
+        const entry = document.createElement("div");
+        entry.className = "event-entry";
+        const title = document.createElement("span");
+        title.className = "entry-title";
+        title.textContent = eventItem.event_title || "";
+        entry.append(title);
+
+        if (eventItem.notes) {
+          const notes = document.createElement("span");
+          notes.className = "entry-notes";
+          notes.textContent = ` - ${eventItem.notes}`;
+          entry.append(notes);
+        }
+
+        cell.append(entry);
+      }
+
+      grid.append(cell);
+    }
+  }
+
+  section.append(grid);
   return section;
 }
 
-function renderSchedule(block, context) {
-  refs.title.textContent = block?.title || state.settings.display_title || "Today's Events";
+function renderSchedule(dayBlocks, context) {
+  const activeBlock = dayBlocks?.[context.period];
+  refs.title.textContent = activeBlock?.title || state.settings.display_title || "Today's Events";
   refs.date.textContent = context.formattedDate;
   refs.time.textContent = context.formattedTime;
   setModeBadge(context.mode);
 
-  const items = sortScheduleItems(block?.schedule_items || []);
+  const morningItems = sortScheduleItems(dayBlocks?.morning?.schedule_items || []);
+  const eveningItems = sortScheduleItems(dayBlocks?.evening?.schedule_items || []);
   clearChildren(refs.eventsContainer);
   setVisible(refs.emptyState, false);
-
-  const defaultRoomMap = new Map();
-  const extraRooms = [];
-  for (const item of items) {
-    const normalized = normalizeRoomName(item.room_name);
-    if (DEFAULT_ROOM_CODES.has(normalized) && !defaultRoomMap.has(normalized)) {
-      defaultRoomMap.set(normalized, item);
-    } else {
-      extraRooms.push(item);
-    }
-  }
-
-  for (const roomName of DEFAULT_ROOM_NAMES) {
-    refs.eventsContainer.append(renderRoomCard(roomName, defaultRoomMap.get(normalizeRoomName(roomName))));
-  }
-
-  const extrasNode = renderExtraRooms(extraRooms);
-  if (extrasNode) {
-    refs.eventsContainer.append(extrasNode);
-  }
+  refs.eventsContainer.append(
+    renderPeriodGrid("morning", morningItems, context),
+    renderPeriodGrid("evening", eveningItems, context)
+  );
 }
 
 async function logBlockChange(previousKey, nextKey, context) {
@@ -216,19 +299,20 @@ async function logBlockChange(previousKey, nextKey, context) {
   });
 }
 
-function ensureRefreshTimer(seconds) {
-  if (state.refreshSeconds === seconds && state.refreshTimer) {
+function ensureRefreshTimer() {
+  if (state.refreshTimer || state.refreshAlignmentTimer) {
     return;
   }
 
-  if (state.refreshTimer) {
-    clearInterval(state.refreshTimer);
-  }
-
-  state.refreshSeconds = seconds;
-  state.refreshTimer = setInterval(() => {
+  const now = Date.now();
+  const msUntilNextMinute = 60000 - (now % 60000);
+  state.refreshAlignmentTimer = setTimeout(() => {
     runRefreshCycle().catch(() => undefined);
-  }, seconds * 1000);
+    state.refreshTimer = setInterval(() => {
+      runRefreshCycle().catch(() => undefined);
+    }, 60000);
+    state.refreshAlignmentTimer = null;
+  }, msUntilNextMinute);
 }
 
 function updateFullscreenButtonText() {
@@ -254,19 +338,21 @@ async function runRefreshCycle() {
     const settings = await fetchSettings();
     state.settings = settings;
     const context = resolveDisplayContext(settings, new Date());
-    const block = await fetchBlock(context.dayOfWeek, context.period);
+    const dayBlocks = await fetchBlock(context.dayOfWeek);
     const currentKey = blockKey(context.dayOfWeek, context.period);
 
-    renderSchedule(block, context);
+    renderSchedule(dayBlocks, context);
     refs.activeBlockText.textContent = `Block: ${formatBlockLabel(context.dayOfWeek, context.period)}`;
-    refs.lastRefreshText.textContent = `Refresh: ${new Date().toLocaleTimeString()}`;
+    refs.lastRefreshText.textContent = `Refresh: ${new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit"
+    }).format(new Date())}`;
     setStatus(`Source: ${context.source} (${context.timezone})`);
 
     await logBlockChange(state.lastBlockKey, currentKey, context).catch(() => undefined);
     state.lastBlockKey = currentKey;
 
-    const refreshSeconds = Math.max(15, Number(settings.display_refresh_seconds || 60));
-    ensureRefreshTimer(refreshSeconds);
+    ensureRefreshTimer();
   } catch (error) {
     const message = error?.message || "Unable to load schedule.";
     setStatus(`Error: ${message}`);

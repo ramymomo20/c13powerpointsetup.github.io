@@ -1,9 +1,9 @@
 import { getSession, isAllowedEditorEmail, onAuthStateChange, signIn, signOut } from "./auth.js";
-import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260312d";
+import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313a";
 import { DAYS, DEFAULT_ROOM_NAMES, DEFAULT_SETTINGS, PERIODS } from "./utils/constants.js";
 import { clearChildren, setMessage, setVisible } from "./utils/dom.js";
 import { formatBlockLabel, settingsRowsToObject, sortScheduleItems, toAppSettingRows } from "./utils/schedule.js";
-import { fromDatetimeLocalToIso, resolveDisplayContext, toDatetimeLocalValue } from "./utils/time.js";
+import { fromDatetimeLocalToIso, getTimeZoneClockParts, resolveDisplayContext, toDatetimeLocalValue } from "./utils/time.js";
 
 const refs = {
   globalMessage: document.getElementById("globalMessage"),
@@ -19,7 +19,6 @@ const refs = {
   periodSelect: document.getElementById("periodSelect"),
   blockTitleInput: document.getElementById("blockTitleInput"),
   itemsBody: document.getElementById("itemsBody"),
-  addRowBtn: document.getElementById("addRowBtn"),
   saveBlockBtn: document.getElementById("saveBlockBtn"),
   clearBlockBtn: document.getElementById("clearBlockBtn"),
   previewBtn: document.getElementById("previewBtn"),
@@ -56,13 +55,28 @@ function showMessage(text, kind = "info") {
   setMessage(refs.globalMessage, text, kind);
 }
 
+function getUpcomingDateLabelForDay(dayValue, timeZone = "America/New_York") {
+  const now = new Date();
+  const nowParts = getTimeZoneClockParts(now, timeZone);
+  const deltaDays = (dayValue - nowParts.dayOfWeek + 7) % 7;
+  const targetDate = new Date(now.getTime() + deltaDays * 24 * 60 * 60 * 1000);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    month: "numeric",
+    day: "numeric",
+    year: "2-digit"
+  }).format(targetDate);
+}
+
 function populateSelects() {
-  refs.daySelect.innerHTML = DAYS.map((day) => `<option value="${day.value}">${day.label}</option>`).join("");
+  refs.daySelect.innerHTML = DAYS
+    .map((day) => `<option value="${day.value}">${day.label} (${getUpcomingDateLabelForDay(day.value)})</option>`)
+    .join("");
   refs.periodSelect.innerHTML = PERIODS.map((period) => `<option value="${period.value}">${period.label}</option>`).join("");
 
   refs.testOverrideDaySelect.innerHTML = [
     `<option value="">(Clock-driven)</option>`,
-    ...DAYS.map((day) => `<option value="${day.value}">${day.label}</option>`)
+    ...DAYS.map((day) => `<option value="${day.value}">${day.label} (${getUpcomingDateLabelForDay(day.value)})</option>`)
   ].join("");
 
   refs.testOverridePeriodSelect.innerHTML = [
@@ -100,44 +114,30 @@ function addDefaultRoomRows() {
 
 function addItemRow(item = {}) {
   const tr = document.createElement("tr");
+  const roomName = item.room_name || "Room";
+  tr.dataset.roomName = roomName;
 
-  const room = buildTextInput(item.room_name || "", "Room A");
+  const room = document.createElement("div");
+  room.className = "room-fixed";
+  room.textContent = roomName;
   const startTime = buildTextInput(item.start_time_text || "", "9:00 AM");
-  const endTime = buildTextInput(item.end_time_text || "", "10:00 AM");
   const eventTitle = buildTextInput(item.event_title || "", "Meeting");
   const notes = buildTextInput(item.notes || "", "Optional notes");
   const visible = document.createElement("input");
   visible.type = "checkbox";
   visible.checked = item.is_visible !== false;
 
-  room.dataset.field = "room_name";
   startTime.dataset.field = "start_time_text";
-  endTime.dataset.field = "end_time_text";
   eventTitle.dataset.field = "event_title";
   notes.dataset.field = "notes";
   visible.dataset.field = "is_visible";
 
-  const removeBtn = document.createElement("button");
-  removeBtn.type = "button";
-  removeBtn.className = "btn btn-small";
-  removeBtn.textContent = "Remove";
-  removeBtn.addEventListener("click", () => {
-    tr.remove();
-    if (!refs.itemsBody.children.length) {
-      addDefaultRoomRows();
-    }
-  });
-
-  const cells = [room, startTime, endTime, eventTitle, notes, visible];
+  const cells = [room, startTime, eventTitle, notes, visible];
   for (const fieldElement of cells) {
     const td = document.createElement("td");
     td.append(fieldElement);
     tr.append(td);
   }
-
-  const actionCell = document.createElement("td");
-  actionCell.append(removeBtn);
-  tr.append(actionCell);
 
   refs.itemsBody.append(tr);
 }
@@ -146,13 +146,12 @@ function collectItemRows() {
   const rows = [...refs.itemsBody.querySelectorAll("tr")];
   return rows
     .map((row, index) => {
-      const roomName = row.querySelector('[data-field="room_name"]')?.value.trim() || "";
+      const roomName = row.dataset.roomName || "Room";
       const startText = row.querySelector('[data-field="start_time_text"]')?.value.trim() || "";
-      const endText = row.querySelector('[data-field="end_time_text"]')?.value.trim() || "";
       const eventTitle = row.querySelector('[data-field="event_title"]')?.value.trim() || "";
       const notes = row.querySelector('[data-field="notes"]')?.value.trim() || "";
       const isVisible = row.querySelector('[data-field="is_visible"]')?.checked ?? true;
-      const hasContent = startText || endText || eventTitle || notes;
+      const hasContent = startText || eventTitle || notes;
       const isDefaultTemplateRoom = DEFAULT_ROOM_CODES.has(normalizeRoomName(roomName));
       const include = Boolean(hasContent || (roomName && !isDefaultTemplateRoom));
 
@@ -160,7 +159,7 @@ function collectItemRows() {
         include,
         room_name: roomName || "Room TBD",
         start_time_text: startText || null,
-        end_time_text: endText || null,
+        end_time_text: null,
         event_title: eventTitle || "Open",
         building_name: null,
         notes: notes || null,
@@ -181,8 +180,7 @@ function setLoadingButtons(disabled) {
     refs.saveSettingsBtn,
     refs.toggleLogsBtn,
     refs.refreshLogsBtn,
-    refs.resetWeekBtn,
-    refs.addRowBtn
+    refs.resetWeekBtn
   ];
   for (const button of buttons) {
     if (button) {
@@ -259,7 +257,6 @@ async function fetchBlock(dayOfWeek, period) {
         id,
         room_name,
         start_time_text,
-        end_time_text,
         event_title,
         notes,
         sort_order,
@@ -282,19 +279,24 @@ function renderEditorBlock(block) {
   clearChildren(refs.itemsBody);
 
   const items = [...(block?.schedule_items || [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-  if (!items.length) {
-    addDefaultRoomRows();
-    return;
+  const itemByRoomCode = new Map();
+  for (const item of items) {
+    const code = normalizeRoomName(item.room_name);
+    if (DEFAULT_ROOM_CODES.has(code) && !itemByRoomCode.has(code)) {
+      itemByRoomCode.set(code, item);
+    }
   }
 
-  const existingRooms = new Set(items.map((item) => normalizeRoomName(item.room_name)));
-  for (const item of items) {
-    addItemRow(item);
-  }
   for (const roomName of DEFAULT_ROOM_NAMES) {
-    if (!existingRooms.has(normalizeRoomName(roomName))) {
-      addItemRow({ room_name: roomName, is_visible: true });
-    }
+    const roomCode = normalizeRoomName(roomName);
+    const roomItem = itemByRoomCode.get(roomCode);
+    addItemRow({
+      room_name: roomName,
+      start_time_text: roomItem?.start_time_text || "",
+      event_title: roomItem?.event_title || "",
+      notes: roomItem?.notes || "",
+      is_visible: roomItem ? roomItem.is_visible !== false : true
+    });
   }
 }
 
@@ -324,7 +326,7 @@ function renderPreview(block, dayOfWeek, period) {
     card.innerHTML = `
       <div class="preview-room">${item.room_name || "Room TBD"}</div>
       <div class="preview-title">${item.event_title || "Meeting"}</div>
-      <div>${item.start_time_text || ""}${item.end_time_text ? ` - ${item.end_time_text}` : ""}</div>
+      <div>${item.start_time_text || ""}</div>
       <div class="muted">${item.notes || ""}</div>
     `;
     refs.previewContainer.append(card);
@@ -610,8 +612,6 @@ function attachHandlers() {
       .then(() => previewSelectedBlock())
       .catch((error) => showMessage(error.message, "error"));
   });
-
-  refs.addRowBtn.addEventListener("click", () => addItemRow());
 
   refs.saveBlockBtn.addEventListener("click", () => {
     setLoadingButtons(true);
