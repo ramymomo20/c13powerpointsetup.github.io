@@ -1,4 +1,4 @@
-import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313d";
+import { isSupabaseConfigured, supabase } from "./supabaseClient.js?v=20260313f";
 import { DEFAULT_ROOM_NAMES, DEFAULT_SETTINGS } from "./utils/constants.js";
 import { clearChildren, setVisible } from "./utils/dom.js";
 import { blockKey, formatBlockLabel, settingsRowsToObject, sortScheduleItems } from "./utils/schedule.js";
@@ -14,7 +14,8 @@ const refs = {
   modeBadge: document.getElementById("modeBadge"),
   eventsContainer: document.getElementById("eventsContainer"),
   emptyState: document.getElementById("emptyState"),
-  statusText: document.getElementById("statusText")
+  statusText: document.getElementById("statusText"),
+  shell: document.querySelector(".display-shell")
 };
 
 const state = {
@@ -32,6 +33,9 @@ function normalizeRoomName(value) {
 
 const DEFAULT_ROOM_CODES = new Set(DEFAULT_ROOM_NAMES.map((name) => normalizeRoomName(name)));
 const ROOM_LABEL_BY_CODE = new Map(DEFAULT_ROOM_NAMES.map((label) => [normalizeRoomName(label), label]));
+const spareWatermark = document.createElement("div");
+spareWatermark.className = "spare-watermark hidden";
+spareWatermark.setAttribute("aria-hidden", "true");
 
 function setStatus(text) {
   refs.statusText.textContent = text;
@@ -322,6 +326,15 @@ function getDayRoomItems(weekBlocks, dayOfWeek, roomCode) {
   });
 }
 
+function getVisibleWeeklyRooms(weekBlocks) {
+  const visibleRooms = DEFAULT_ROOM_NAMES.filter((roomName) => {
+    const roomCode = normalizeRoomName(roomName);
+    return Array.from({ length: 7 }, (_, dayIndex) => getDayRoomItems(weekBlocks, dayIndex, roomCode)).some((items) => items.length);
+  });
+
+  return visibleRooms.length ? visibleRooms : DEFAULT_ROOM_NAMES;
+}
+
 function renderWeeklyGrid(weekBlocks, context) {
   const section = document.createElement("section");
   section.className = "period-section weekly-section";
@@ -346,11 +359,11 @@ function renderWeeklyGrid(weekBlocks, context) {
   for (const day of weekDays) {
     const dayHead = document.createElement("div");
     dayHead.className = "weekly-day-head";
-    dayHead.innerHTML = `<span class="day-name">${day.weekdayShort}</span><span class="day-date">${day.monthDay}</span>`;
+    dayHead.innerHTML = `<span class="day-name">${day.weekdayLong}</span><span class="day-date">${day.monthDay}</span>`;
     board.append(dayHead);
   }
 
-  DEFAULT_ROOM_NAMES.forEach((roomName, roomIndex) => {
+  getVisibleWeeklyRooms(weekBlocks).forEach((roomName, roomIndex) => {
     const roomCode = normalizeRoomName(roomName);
     const roomCell = document.createElement("div");
     roomCell.className = "weekly-room-label";
@@ -391,6 +404,10 @@ function renderWeeklyGrid(weekBlocks, context) {
   return section;
 }
 
+function appendWatermarkCard() {
+  refs.eventsContainer.append(spareWatermark);
+}
+
 function renderDaily(weekBlocks, context) {
   const weekDays = getRepresentedWeekDates(state.settings, context.effectiveDate);
   const dayBlocks = weekBlocks?.[context.dayOfWeek] || { morning: null, evening: null };
@@ -405,6 +422,7 @@ function renderDaily(weekBlocks, context) {
     renderPeriodGrid("morning", morningItems, context),
     renderPeriodGrid("evening", eveningItems, context)
   );
+  appendWatermarkCard();
 }
 
 function renderWeekly(weekBlocks, context) {
@@ -413,6 +431,7 @@ function renderWeekly(weekBlocks, context) {
   refs.viewDescription.textContent = `Room calendar for ${weekDays[0].monthDay} through ${weekDays[6].monthDay}.`;
   clearChildren(refs.eventsContainer);
   refs.eventsContainer.append(renderWeeklyGrid(weekBlocks, context));
+  appendWatermarkCard();
 }
 
 function renderDisplay(weekBlocks, context) {
@@ -431,6 +450,21 @@ function renderDisplay(weekBlocks, context) {
 function updateViewToggleLabel() {
   const isWeekly = state.viewMode === "weekly";
   refs.viewToggleBtn.textContent = isWeekly ? "Switch To Daily View" : "Switch To Weekly View";
+}
+
+function updateSpareWatermark() {
+  requestAnimationFrame(() => {
+    const spareHeight = refs.eventsContainer.clientHeight - refs.eventsContainer.scrollHeight;
+    const shouldShow = document.body.classList.contains("fullscreen-active") && spareHeight > 120;
+    setVisible(spareWatermark, shouldShow);
+    if (!shouldShow) {
+      spareWatermark.style.removeProperty("--watermark-height");
+      return;
+    }
+
+    const height = Math.max(110, Math.min(260, Math.floor(spareHeight - 28)));
+    spareWatermark.style.setProperty("--watermark-height", `${height}px`);
+  });
 }
 
 async function logBlockChange(previousKey, nextKey, context) {
@@ -484,6 +518,7 @@ function updateFullscreenButtonText() {
   const isFullscreen = Boolean(document.fullscreenElement);
   refs.fullscreenBtn.textContent = isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen";
   document.body.classList.toggle("fullscreen-active", isFullscreen);
+  updateSpareWatermark();
 }
 
 async function toggleFullscreen() {
@@ -509,6 +544,7 @@ async function runRefreshCycle() {
     const currentKey = blockKey(context.dayOfWeek, context.period);
 
     renderDisplay(weekBlocks, context);
+    updateSpareWatermark();
     setStatus(`Block: ${formatBlockLabel(context.dayOfWeek, context.period)} | ${context.source}`);
     await logBlockChange(state.lastBlockKey, currentKey, context).catch(() => undefined);
     state.lastBlockKey = currentKey;
@@ -555,6 +591,7 @@ async function init() {
     }
   });
   window.addEventListener("focus", () => runRefreshCycle().catch(() => undefined));
+  window.addEventListener("resize", updateSpareWatermark);
 }
 
 init().catch((error) => {

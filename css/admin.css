@@ -33,7 +33,7 @@ body::before {
 
 .admin-top {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 1rem;
   align-items: center;
   margin-bottom: 1rem;
@@ -45,22 +45,6 @@ body::before {
 
 .admin-brand-copy h1 {
   margin-bottom: 0;
-}
-
-.header-logo-stack {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-}
-
-.header-logo-stack img {
-  display: block;
-  height: 52px;
-  width: auto;
-  object-fit: contain;
-  border-radius: 0.55rem;
-  box-shadow: 0 8px 18px rgba(13, 70, 41, 0.12);
 }
 
 .top-actions {
@@ -338,9 +322,5 @@ body::before {
 
   .settings-grid {
     grid-template-columns: 1fr;
-  }
-
-  .header-logo-stack img {
-    height: 42px;
   }
 }
